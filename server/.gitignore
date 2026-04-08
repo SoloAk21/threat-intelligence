@@ -1,0 +1,80 @@
+# ======================
+# Node modules
+# ======================
+node_modules/
+**/node_modules/
+
+# ======================
+# Build outputs
+# ======================
+dist/
+build/
+.out/
+.next/
+.env
+
+# ======================
+# Logs
+# ======================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ======================
+# Environment files
+# ======================
+.env
+.env.*
+!.env.example
+
+# ======================
+# OS / System
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# IDE / Editor
+# ======================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ======================
+# Testing
+# ======================
+coverage/
+playwright-report/
+test-results/
+
+# ======================
+# Vite specific
+# ======================
+.vite/
+vite.svg
+
+# ======================
+# TypeScript
+# ======================
+*.tsbuildinfo
+
+# ======================
+# Cache
+# ======================
+.cache/
+.tmp/
+temp/
+
+# ======================
+# Bun
+# ======================
+bun.lockb
+
+# ======================
+# Misc
+# ======================
+*.local

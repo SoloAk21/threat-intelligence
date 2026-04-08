@@ -1,3 +1,4 @@
+// src/routes/analysis.routes.js (updated health check)
 const express = require("express");
 const router = express.Router();
 const analysisController = require("../controllers/analysis.controller");
@@ -5,10 +6,10 @@ const rateLimiter = require("../middlewares/rateLimiter");
 
 router.post("/analyze", rateLimiter, analysisController.analyze);
 
-// Health check (no rate limit)
 router.get("/health", (req, res) => {
   res.json({
     status: "✅ Advanced Cyber Intel Server Running",
+    supported_types: ["ip", "url", "domain", "hash", "email"],
     supported_sources: [
       "VirusTotal",
       "AbuseIPDB",
@@ -21,7 +22,7 @@ router.get("/health", (req, res) => {
       "Shodan",
       "Censys",
       "IPinfo",
-      "Cisco Talos (scrape)",
+      "Cisco Talos",
       "Multi-RBL",
       "InQuest RepDB",
       "ThreatMiner",
@@ -29,7 +30,15 @@ router.get("/health", (req, res) => {
       "IOC.one",
       "IPTeoh",
       "IPify",
+      "URLScan.io",
+      "URLHaus",
+      "Sucuri SiteCheck",
     ],
+    api_keys_configured: {
+      URLSCAN: !!process.env.URLSCAN_API_KEY || "using default",
+      URLHAUS: "no key required",
+      SUCURI: !!process.env.SUCURI_API_KEY || "using default",
+    },
     port: process.env.PORT || 5000,
   });
 });

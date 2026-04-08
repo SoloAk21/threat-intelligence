@@ -1,6 +1,7 @@
 // src/controllers/analysis.controller.js
 const threatService = require("../services/threat.service");
 const { calculateRiskScore } = require("../utils/riskCalculator");
+const { detectInputType } = require("../utils/inputDetector");
 const validator = require("validator");
 
 const analyze = async (req, res, next) => {
@@ -16,10 +17,8 @@ const analyze = async (req, res, next) => {
 
     const trimmedInput = input.trim();
 
-    let analysisType = forcedType || "ip";
-    if (!forcedType && validator.isIP(trimmedInput)) {
-      analysisType = "ip";
-    }
+    // Auto-detect input type if not forced
+    const analysisType = forcedType || detectInputType(trimmedInput);
 
     let vt,
       abuseipdb,
@@ -39,8 +38,12 @@ const analyze = async (req, res, next) => {
       ipteoh,
       ipify,
       malwareurl,
-      iocone;
+      iocone,
+      urlscan,
+      urlhaus,
+      sucuri;
 
+    // IP-specific services
     if (analysisType === "ip") {
       const promises = [
         threatService.getVTReport("ip", trimmedInput),
@@ -60,7 +63,6 @@ const analyze = async (req, res, next) => {
         threatService.checkThreatMiner(trimmedInput),
         threatService.checkIPTeoh(trimmedInput),
         threatService.checkIPify(trimmedInput),
-
         threatService.checkMalwareURL(trimmedInput),
         threatService.checkIOCOne(trimmedInput),
       ];
@@ -86,10 +88,76 @@ const analyze = async (req, res, next) => {
         ipify,
         malwareurl,
         iocone,
-      ] = results.map((result) =>
-        result.status === "fulfilled"
-          ? result.value
-          : { error: "Service failed" },
+      ] = results.map((r) =>
+        r.status === "fulfilled" ? r.value : { error: "Service failed" },
+      );
+    }
+
+    // URL-specific services
+    if (analysisType === "url") {
+      const promises = [
+        threatService.getVTReport("url", trimmedInput),
+        threatService.checkAlienVaultOTX("url", trimmedInput),
+        threatService.checkPulsedive(trimmedInput),
+        threatService.checkThreatFox(trimmedInput),
+        threatService.checkThreatMiner(trimmedInput),
+        threatService.checkMalwareURL(trimmedInput),
+        threatService.checkIOCOne(trimmedInput),
+        threatService.checkURLScan(trimmedInput),
+        threatService.checkURLHaus(trimmedInput),
+        threatService.checkSucuri(trimmedInput),
+      ];
+
+      const results = await Promise.allSettled(promises);
+      [
+        vt,
+        otx,
+        pulsedive,
+        threatfox,
+        threatminer,
+        malwareurl,
+        iocone,
+        urlscan,
+        urlhaus,
+        sucuri,
+      ] = results.map((r) =>
+        r.status === "fulfilled" ? r.value : { error: "Service failed" },
+      );
+    }
+
+    // Domain-specific services
+    if (analysisType === "domain") {
+      const promises = [
+        threatService.getVTReport("domain", trimmedInput),
+        threatService.checkAlienVaultOTX("domain", trimmedInput),
+        threatService.checkPulsedive(trimmedInput),
+        threatService.checkThreatFox(trimmedInput),
+        threatService.checkThreatMiner(trimmedInput),
+        threatService.checkMalwareURL(trimmedInput),
+        threatService.checkIOCOne(trimmedInput),
+        threatService.checkSucuri(trimmedInput),
+      ];
+
+      const results = await Promise.allSettled(promises);
+      [vt, otx, pulsedive, threatfox, threatminer, malwareurl, iocone, sucuri] =
+        results.map((r) =>
+          r.status === "fulfilled" ? r.value : { error: "Service failed" },
+        );
+    }
+
+    // File/Hash-specific services
+    if (analysisType === "hash") {
+      const promises = [
+        threatService.getVTReport("file", trimmedInput),
+        threatService.checkAlienVaultOTX("file", trimmedInput),
+        threatService.checkPulsedive(trimmedInput),
+        threatService.checkThreatFox(trimmedInput),
+        threatService.checkMalwareURL(trimmedInput),
+      ];
+
+      const results = await Promise.allSettled(promises);
+      [vt, otx, pulsedive, threatfox, malwareurl] = results.map((r) =>
+        r.status === "fulfilled" ? r.value : { error: "Service failed" },
       );
     }
 
@@ -109,6 +177,10 @@ const analyze = async (req, res, next) => {
       threatminer,
       malwareurl,
       ipify,
+      urlscan,
+      urlhaus,
+      sucuri,
+      analysisType,
     });
 
     const riskLevel =
@@ -120,16 +192,14 @@ const analyze = async (req, res, next) => {
             ? "MEDIUM"
             : "LOW";
 
-    // Wrap the response in a 'data' field to match frontend expectations
     return res.json({
       success: true,
       data: {
-        // <-- ADD THIS WRAPPER
         type: analysisType,
         input: trimmedInput,
         riskScore,
         riskLevel,
-        inputType: analysisType, // <-- ADD THIS for frontend compatibility
+        inputType: analysisType,
         timestamp: new Date().toISOString(),
         vt,
         abuseipdb,
@@ -150,6 +220,9 @@ const analyze = async (req, res, next) => {
         ipify,
         malwareurl,
         iocone,
+        urlscan,
+        urlhaus,
+        sucuri,
       },
     });
   } catch (err) {
