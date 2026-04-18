@@ -177,7 +177,7 @@ export function UnifiedAnalysisPage() {
             </span>
           </div>
           {detectedType && (
-            <span className="text-[9px] text-muted-foreground/50 px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/30 flex items-center gap-1">
+            <span className="text-[9px] text-muted-foreground/50 px-1.5 py-0.5 bg-primary/10  border border-primary/30 flex items-center gap-1">
               {getTypeIcon()}
               {getTypeLabel()}
             </span>
