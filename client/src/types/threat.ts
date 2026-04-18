@@ -467,34 +467,49 @@ export interface IPifyData {
 
 export interface ThreatData {
   riskScore: number;
+  riskLevel?: string;
   input: string;
   inputType: "ip" | "url" | "domain" | "hash" | "email";
   timestamp: string;
   type?: string;
-  riskLevel?: string;
-  vt?: VirusTotalData;
+
+  vt?: any; // VirusTotalData
   abuseipdb?: AbuseIPDBData;
   otx?: OTXData;
-  greynoise?: GreyNoiseData;
-  pulsedive?: PulsediveData;
-  multirbl?: MultiRBLData;
-  ipinfo?: IPInfoData;
-  threatfox?: ThreatFoxData;
+  greynoise?: GreyNoiseData; // ← Updated
+  pulsedive?: any;
+  multirbl?: any;
+  ipinfo?: any;
+  threatfox?: any;
   shodan?: any;
-  censys?: CensysData;
+  censys?: any;
   talos?: any;
-  vpnapi?: VPNAPIData;
-  ipteoh?: IPTeohData;
+  vpnapi?: any;
+  ipteoh?: any;
   malwareurl?: any;
   iocone?: any;
-  inquest?: InQuestData;
+  inquest?: any;
   threatminer?: any;
-  ipqualityscore?: IPQualityScoreData;
-  ipify?: IPifyData;
+  ipqualityscore?: any;
+  ipify?: any;
 
-  urlscan?: URLScanData;
-  urlhaus?: URLHausData;
-  sucuri?: SucuriData;
+  urlscan?: any;
+  urlhaus?: any;
+  sucuri?: any;
+
+  aiSummary?: {
+    executiveSummary: string;
+    riskAssessment: string;
+    keyIndicators: string[];
+    potentialThreats: string[];
+    recommendations: string[];
+    confidenceLevel: "HIGH" | "MEDIUM" | "LOW";
+    sourcesContributingMost: string[];
+  };
+  aiSummaryMeta?: {
+    generatedAt: string;
+    modelUsed?: string;
+  };
 }
 
 export interface IPQualityScoreData {

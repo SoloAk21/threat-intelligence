@@ -42,5 +42,23 @@ router.get("/health", (req, res) => {
     port: process.env.PORT || 5000,
   });
 });
+router.post("/test-gemini", async (req, res, next) => {
+  try {
+    const { input } = req.body;
+    if (!input) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Input is required for test" });
+    }
 
+    // This will be handled in controller if you want, but for now we can keep it simple
+    res.json({
+      success: true,
+      message: "Gemini test endpoint ready. Use /analyze for full integration.",
+      note: "Gemini summary is now integrated into the main /analyze endpoint",
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 module.exports = router;
