@@ -1,3 +1,4 @@
+// src/components/SignIn.tsx
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "../store/authStore";
@@ -5,7 +6,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
+import { Mail, Lock, AlertCircle, ShieldCheck, LogIn } from "lucide-react";
 
 interface SignInProps {
   onSwitchToSignUp: () => void;
@@ -63,14 +64,14 @@ export const SignIn: React.FC<SignInProps> = ({
             Email Address
           </Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-primary/40" />
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="pl-9 bg-background/50 border-border/30 focus:border-purple-500/50 text-sm"
+              className="pl-9 bg-background/50 border-border/30 focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/20 text-sm"
               required
             />
           </div>
@@ -84,14 +85,14 @@ export const SignIn: React.FC<SignInProps> = ({
             Password
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-primary/40" />
             <Input
               id="password"
               type="password"
               placeholder="••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-9 bg-background/50 border-border/30 focus:border-purple-500/50 text-sm"
+              className="pl-9 bg-background/50 border-border/30 focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/20 text-sm"
               required
             />
           </div>
@@ -99,7 +100,7 @@ export const SignIn: React.FC<SignInProps> = ({
 
         <Button
           type="submit"
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-2 transition-all duration-200"
+          className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white text-sm font-medium py-2 transition-all duration-200 mt-4"
           disabled={isLoading}
         >
           {isLoading ? (
@@ -109,7 +110,7 @@ export const SignIn: React.FC<SignInProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" />
+              <LogIn className="h-4 w-4" />
               <span>Sign In</span>
             </div>
           )}
@@ -129,9 +130,9 @@ export const SignIn: React.FC<SignInProps> = ({
         <button
           type="button"
           onClick={onSwitchToSignUp}
-          className="w-full text-center text-sm text-purple-500 hover:text-purple-400 transition-colors"
+          className="w-full text-center text-sm text-brand-primary hover:text-brand-primary/80 transition-colors font-medium"
         >
-          Create an account
+          Create an account →
         </button>
       </form>
     </div>

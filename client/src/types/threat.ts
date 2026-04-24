@@ -1,37 +1,40 @@
-// src/types/threat.ts - Updated GreyNoiseData interface
+// src/types/threat.ts
 
 export interface GreyNoiseData {
   classification: "benign" | "malicious" | "unknown";
   noise: boolean;
+  riot: boolean;
+  name: string;
+  link: string;
+  last_seen?: string;
+  first_seen?: string;
+  message?: string;
+  // Additional fields from raw data
+  ip?: string;
+  seen?: boolean;
   vpn?: boolean;
   proxy?: boolean;
   tor?: boolean;
   bot?: boolean;
   mobile?: boolean;
   datacenter?: boolean;
-  seen?: boolean;
-  riot?: boolean;
-  ip?: string;
   asn?: string;
   organization?: string;
   country?: string;
-  countryCode?: string;
+  country_code?: string;
   city?: string;
-  firstSeen?: string;
-  lastSeen?: string;
   tags?: string[];
   cve?: string[];
-  link?: string;
   raw?: {
-    ip?: string;
-    noise?: boolean;
-    riot?: boolean;
-    classification?: string;
-    name?: string;
-    link?: string;
-    last_seen?: string;
+    ip: string;
+    noise: boolean;
+    riot: boolean;
+    classification: string;
+    name: string;
+    link: string;
+    last_seen: string;
     first_seen?: string;
-    message?: string;
+    message: string;
     seen?: boolean;
     vpn?: boolean;
     proxy?: boolean;
@@ -47,9 +50,6 @@ export interface GreyNoiseData {
     };
     asn?: string;
     organization?: string;
-    country?: string;
-    country_code?: string;
-    city?: string;
     tags?: string[];
     cve?: string[];
     metadata?: {
@@ -84,7 +84,15 @@ export interface GreyNoiseData {
   };
 }
 
-// The rest of the file remains unchanged...
+export interface AbuseIPDBReport {
+  reportedAt: string;
+  comment: string;
+  categories: number[];
+  reporterId?: number;
+  fromIpCountryCode?: string;
+  fromIpCountryName?: string;
+}
+
 export interface AbuseIPDBRawData {
   ipAddress: string;
   isPublic: boolean;
@@ -104,28 +112,22 @@ export interface AbuseIPDBRawData {
   reports?: AbuseIPDBReport[];
 }
 
-export interface AbuseIPDBReport {
-  reportedAt: string;
-  comment: string;
-  categories: number[];
-  reporterId?: number;
-  reporterCountry?: string;
-  reporterCountryCode?: string;
-}
-
 export interface AbuseIPDBData {
   abuseConfidenceScore: number;
   totalReports: number;
-  country: string;
   countryCode?: string;
   countryName?: string;
   usageType: string;
-  isWhitelisted: boolean;
-  ipAddress?: string;
   isp?: string;
   domain?: string;
+  isWhitelisted: boolean;
+  isTor?: boolean;
   numDistinctUsers?: number;
   lastReportedAt?: string;
+  ipAddress?: string;
+  isPublic?: boolean;
+  ipVersion?: number;
+  hostnames?: string[];
   reports?: AbuseIPDBReport[];
   raw?: AbuseIPDBRawData;
 }
@@ -141,18 +143,11 @@ export interface OTXPulse {
   public: number;
   adversary: string;
   targeted_countries: string[];
-  malware_families: Array<{
-    id?: string;
-    display_name: string;
-    target?: string;
-  }>;
-  attack_ids: Array<{
-    id: string;
-    name: string;
-    display_name: string;
-  }>;
+  malware_families: any[];
+  attack_ids: any[];
   industries: string[];
   TLP: string;
+  cloned_from: string | null;
   export_count: number;
   upvotes_count: number;
   downvotes_count: number;
@@ -170,18 +165,7 @@ export interface OTXPulse {
     is_subscribed: boolean;
     is_following: boolean;
   };
-  indicator_type_counts: {
-    IPv4?: number;
-    IPv6?: number;
-    URL?: number;
-    domain?: number;
-    FileHash?: number;
-    FileHash_SHA256?: number;
-    "FileHash-SHA256"?: number;
-    email?: number;
-    CVE?: number;
-    hostname?: number;
-  };
+  indicator_type_counts: Record<string, number>;
   indicator_count: number;
   is_author: boolean;
   is_subscribing: boolean | null;
@@ -203,6 +187,8 @@ export interface OTXData {
   is_malicious: boolean;
   tags: string[];
   pulses?: OTXPulse[];
+  malware_families?: any[];
+  attack_ids?: any[];
   raw?: {
     whois?: string;
     reputation?: number;
@@ -240,14 +226,14 @@ export interface OTXData {
     validation?: string[];
     asn?: string;
     city_data?: boolean;
-    city?: string;
-    region?: string;
+    city?: string | null;
+    region?: string | null;
     continent_code?: string;
     country_code3?: string;
     country_code2?: string;
-    subdivision?: string;
+    subdivision?: string | null;
     latitude?: number;
-    postal_code?: string;
+    postal_code?: string | null;
     longitude?: number;
     accuracy_radius?: number;
     country_code?: string;
@@ -262,31 +248,40 @@ export interface OTXData {
 }
 
 export interface PulsediveData {
+  error?: string;
   risk: string;
   score: number;
   is_malicious?: boolean;
-  threats: {
+  threats?: Array<{
     tid?: number;
     name: string;
     category?: string;
     risk?: string;
     stamp_linked?: string;
-  }[];
+  }>;
   properties?: Record<string, any>;
   raw?: any;
+  note?: string;
+}
+
+export interface MultiRBLList {
+  name: string;
+  listed: boolean;
+  weight?: number;
 }
 
 export interface MultiRBLData {
   listedCount: number;
   totalChecked: number;
-  is_blacklisted?: boolean;
-  lists: { name: string; listed: boolean }[];
+  is_blacklisted: boolean;
+  weighted_score?: number;
+  lists: MultiRBLList[];
   note?: string;
 }
 
 export interface IPInfoData {
   ip: string;
-  hostname?: string;
+  hostname?: string | null;
   city?: string;
   region?: string;
   country?: string;
@@ -298,33 +293,12 @@ export interface IPInfoData {
   longitude?: number;
   asn?: string;
   org_name?: string;
-  geo?: {
-    city?: string;
-    region?: string;
-    region_code?: string;
-    country?: string;
-    country_code?: string;
-    continent?: string;
-    continent_code?: string;
-    latitude?: number;
-    longitude?: number;
-    timezone?: string;
-    postal_code?: string;
-  };
-  as?: {
-    asn?: string;
-    name?: string;
-    domain?: string;
-    type?: string;
-    route?: string;
-  };
   privacy?: {
     vpn?: boolean;
     proxy?: boolean;
     tor?: boolean;
     hosting?: boolean;
     relay?: boolean;
-    service?: string | null;
   };
   abuse?: {
     address?: string;
@@ -348,33 +322,33 @@ export interface IPInfoData {
     mcc?: string;
     mnc?: string;
   };
-  is_anonymous?: boolean;
-  is_anycast?: boolean;
-  is_hosting?: boolean;
-  is_mobile?: boolean;
-  is_satellite?: boolean;
-  rate_limit?: {
-    tier: string;
-    requests_per_month: number;
-    used?: number;
-    remaining?: number;
-    endpoint?: string;
-    credits_used?: number;
-    message?: string;
-    available?: boolean;
-  };
-  error?: string;
-  note?: string;
   raw?: any;
   enriched?: any;
+  note?: string;
+  error?: string;
 }
 
 export interface ThreatFoxData {
   ioc?: string;
   ioc_count: number;
-  is_malicious?: boolean;
-  iocs?: { ioc: string; threat_type: string; malware: string }[];
-  raw?: any;
+  is_malicious: boolean;
+  iocs?: Array<{
+    ioc: string;
+    threat_type: string;
+    malware: string;
+  }>;
+  raw?: {
+    query_status?: string;
+    data?: string;
+  };
+  note?: string;
+}
+
+export interface VirusTotalAnalysisResult {
+  method: string;
+  engine_name: string;
+  category: string;
+  result: string;
 }
 
 export interface VirusTotalData {
@@ -385,21 +359,13 @@ export interface VirusTotalData {
     harmless: number;
     timeout?: number;
   };
-  last_analysis_results?: Record<
-    string,
-    {
-      method: string;
-      engine_name: string;
-      category: string;
-      result: string;
-    }
-  >;
+  last_analysis_results?: Record<string, VirusTotalAnalysisResult>;
   asn: number;
   as_owner: string;
   country: string;
   continent: string;
   network: string;
-  jarm: string;
+  jarm?: string;
   reputation?: number;
   last_analysis_date?: number;
   input?: string;
@@ -411,105 +377,111 @@ export interface VirusTotalData {
     harmless: number;
     malicious: number;
   };
-  last_https_certificate?: {
-    subject?: {
-      CN?: string;
-      OU?: string;
-    };
-    validity?: {
-      not_before?: string;
-      not_after?: string;
-    };
-    issuer?: {
-      C?: string;
-      CN?: string;
-      O?: string;
-    };
-  };
-  crowdsourced_context?: Array<{
-    details?: string;
-    link?: string;
-    severity?: string;
-    timestamp?: number;
-    title?: string;
-    source?: string;
-  }>;
   rdap?: any;
+  id?: string;
+  type?: string;
+  whois_date?: number;
+}
+
+export interface IPifyLocation {
+  country: string;
+  region: string;
+  city: string;
+  lat: number;
+  lng: number;
+  postalCode: string;
+  timezone: string;
+  geonameId?: number;
+}
+
+export interface IPifyAS {
+  asn: number;
+  name: string;
+  route: string;
+  domain: string;
+  type?: string;
+}
+
+export interface IPifyProxy {
+  proxy: boolean;
+  vpn: boolean;
+  tor: boolean;
 }
 
 export interface IPifyData {
   ip: string;
-  location: {
-    country: string;
-    region: string;
-    city: string;
-    lat: number;
-    lng: number;
-    postalCode: string;
-    timezone: string;
-    geonameId: number;
-  };
+  location: IPifyLocation;
   domains: string[];
-  as: {
-    asn: number;
-    name: string;
-    route: string;
-    domain: string;
-    type: string;
-  };
+  as: IPifyAS;
   isp: string;
-  proxy: {
-    proxy: boolean;
-    vpn: boolean;
-    tor: boolean;
-  };
+  proxy: IPifyProxy;
 }
 
-export interface ThreatData {
-  riskScore: number;
-  riskLevel?: string;
-  input: string;
-  inputType: "ip" | "url" | "domain" | "hash" | "email";
-  timestamp: string;
-  type?: string;
+export interface VPNAPILocation {
+  city: string;
+  region: string;
+  country: string;
+  continent: string;
+  region_code: string;
+  country_code: string;
+  continent_code: string;
+  latitude: string;
+  longitude: string;
+  time_zone: string;
+  locale_code: string;
+  metro_code: string;
+  is_in_european_union: boolean;
+}
 
-  vt?: any; // VirusTotalData
-  abuseipdb?: AbuseIPDBData;
-  otx?: OTXData;
-  greynoise?: GreyNoiseData; // ← Updated
-  pulsedive?: any;
-  multirbl?: any;
-  ipinfo?: any;
-  threatfox?: any;
-  shodan?: any;
-  censys?: any;
-  talos?: any;
-  vpnapi?: any;
-  ipteoh?: any;
-  malwareurl?: any;
-  iocone?: any;
-  inquest?: any;
-  threatminer?: any;
-  ipqualityscore?: any;
-  ipify?: any;
+export interface VPNAPINetwork {
+  network: string;
+  autonomous_system_number: string;
+  autonomous_system_organization: string;
+}
 
-  urlscan?: any;
-  urlhaus?: any;
-  sucuri?: any;
+export interface VPNAPISecurity {
+  vpn: boolean;
+  proxy: boolean;
+  tor: boolean;
+  relay: boolean;
+}
 
-  aiSummary?: {
-    executiveSummary: string;
-    riskAssessment: string;
-    keyIndicators: string[];
-    potentialThreats: string[];
-    recommendations: string[];
-    confidenceLevel: "HIGH" | "MEDIUM" | "LOW";
-    sourcesContributingMost: string[];
-  };
-  aiSummaryMeta?: {
-    generatedAt: string;
-    modelUsed?: string;
-  };
+export interface VPNAPIData {
+  ip: string;
+  security: VPNAPISecurity;
+  location: VPNAPILocation;
+  network: VPNAPINetwork;
+}
+
+export interface IPTeohData {
+  ip: string;
+  security: VPNAPISecurity;
+  location: VPNAPILocation;
+  network: VPNAPINetwork;
+}
+
+export interface ShodanData {
+  note?: string;
+  ports: number[];
+  cves: string[];
+  error?: string;
+}
+
+export interface CensysData {
+  note?: string;
+  services: Array<{
+    port?: number;
+    service_name?: string;
+    transport?: string;
+    extended_service_name?: string;
+  }>;
+  raw?: any;
+}
+
+export interface TalosData {
+  note?: string;
+  blacklisted: boolean;
+  error?: string;
 }
 
 export interface IPQualityScoreData {
@@ -518,8 +490,10 @@ export interface IPQualityScoreData {
   proxy: boolean;
   tor: boolean;
   recent_abuse: boolean;
+  bot_status?: boolean;
   is_crawler?: boolean;
   mobile?: boolean;
+  active?: boolean;
   isp?: string;
   organization?: string;
   hostname?: string;
@@ -528,103 +502,6 @@ export interface IPQualityScoreData {
     success?: boolean;
     message?: string;
     request_id?: string;
-    ip?: string;
-    timestamp?: string;
-    country?: string;
-    city?: string;
-    region?: string;
-    postal_code?: string;
-    latitude?: number;
-    longitude?: number;
-    isp?: string;
-    organization?: string;
-    hostname?: string;
-    asn?: string;
-  };
-}
-
-export interface CensysData {
-  services: Array<{
-    port?: number;
-    service_name?: string;
-    transport?: string;
-    extended_service_name?: string;
-  }>;
-  raw?: {
-    result?: {
-      resource?: {
-        ip?: string;
-        location?: {
-          continent?: string;
-          country?: string;
-          country_code?: string;
-          city?: string;
-          postal_code?: string;
-          timezone?: string;
-          province?: string;
-          coordinates?: {
-            latitude?: number;
-            longitude?: number;
-          };
-        };
-        autonomous_system?: {
-          asn?: number;
-          description?: string;
-          bgp_prefix?: string;
-          name?: string;
-          country_code?: string;
-        };
-        whois?: {
-          network?: {
-            handle?: string;
-            name?: string;
-            cidrs?: string[];
-            created?: string;
-            updated?: string;
-            allocation_type?: string;
-          };
-          organization?: {
-            handle?: string;
-            name?: string;
-            street?: string;
-            city?: string;
-            state?: string;
-            postal_code?: string;
-            country?: string;
-            abuse_contacts?: Array<{
-              handle?: string;
-              name?: string;
-              email?: string;
-            }>;
-            admin_contacts?: Array<{
-              handle?: string;
-              name?: string;
-              email?: string;
-            }>;
-            tech_contacts?: Array<{
-              handle?: string;
-              name?: string;
-              email?: string;
-            }>;
-          };
-        };
-        dns?: {
-          reverse_dns?: {
-            resolve_time?: string;
-          };
-          names?: string[];
-          forward_dns?: Record<
-            string,
-            {
-              resolve_time?: string;
-              name?: string;
-              record_type?: string;
-            }
-          >;
-        };
-      };
-      extensions?: any;
-    };
   };
 }
 
@@ -636,94 +513,31 @@ export interface InQuestSource {
   source_url?: string | null;
 }
 
-export interface InQuestRawEntry {
-  created_date: string;
-  data: string;
-  data_type: string;
-  derived: string;
-  derived_type: string;
-  source: string;
-  source_url: string | null;
-}
-
 export interface InQuestData {
   reputation_hits: number;
   is_malicious: boolean;
   sources: InQuestSource[];
   note?: string;
-  raw?: InQuestRawEntry[];
+  raw?: any[];
 }
 
-export interface VPNAPIData {
-  ip: string;
-  security: {
-    vpn: boolean;
-    proxy: boolean;
-    tor: boolean;
-    relay: boolean;
-  };
-  location: {
-    city: string;
-    region: string;
-    country: string;
-    continent: string;
-    region_code: string;
-    country_code: string;
-    continent_code: string;
-    latitude: string;
-    longitude: string;
-    time_zone: string;
-    locale_code: string;
-    metro_code: string;
-    is_in_european_union: boolean;
-  };
-  network: {
-    network: string;
-    autonomous_system_number: string;
-    autonomous_system_organization: string;
-  };
+export interface ThreatMinerData {
+  note?: string;
+  detections: number;
+  error?: string;
 }
 
-export interface IPTeohData {
-  ip: string;
-  security: {
-    vpn: boolean;
-    proxy: boolean;
-    tor: boolean;
-    relay: boolean;
-  };
-  location: {
-    city: string;
-    region: string;
-    country: string;
-    continent: string;
-    region_code: string;
-    country_code: string;
-    continent_code: string;
-    latitude: string;
-    longitude: string;
-    time_zone: string;
-    locale_code: string;
-    metro_code: string;
-    is_in_european_union: boolean;
-  };
-  network: {
-    network: string;
-    autonomous_system_number: string;
-    autonomous_system_organization: string;
-  };
+export interface MalwareURLData {
+  is_malicious: boolean;
+  note?: string;
+  error?: string;
 }
 
-export interface AnalysisResponse {
-  success: boolean;
-  data: ThreatData;
-}
-
-export interface SearchHistoryItem {
-  input: string;
-  inputType: string;
-  riskScore: number;
-  timestamp: string;
+export interface IOCOneData {
+  note?: string;
+  hits: number;
+  is_malicious: boolean;
+  error?: string;
 }
 
 export interface URLScanData {
@@ -748,18 +562,20 @@ export interface URLScanData {
   raw?: any;
 }
 
+export interface URLHausURL {
+  id?: string;
+  url: string;
+  threat?: string;
+  tags?: string[];
+  date_added?: string;
+}
+
 export interface URLHausData {
   is_malicious: boolean;
   count: number;
   threat_types?: string[];
   tags?: string[];
-  urls?: Array<{
-    id?: string;
-    url: string;
-    threat?: string;
-    tags?: string[];
-    date_added?: string;
-  }>;
+  urls?: URLHausURL[];
   raw?: any;
 }
 
@@ -778,4 +594,105 @@ export interface SucuriData {
   scan_id?: string;
   scanned_at?: string;
   raw?: any;
+}
+
+export interface AISummary {
+  executiveSummary: string;
+  riskAssessment?: string;
+  keyIndicators: string[];
+  potentialThreats: string[];
+  recommendations: string[];
+  confidenceLevel: "HIGH" | "MEDIUM" | "LOW";
+  sourcesContributingMost: string[];
+  tacticalAdvice?: string;
+}
+
+export interface AISummaryMeta {
+  generatedAt: string;
+  model?: string;
+  promptTokens?: number;
+  responseTokens?: number;
+}
+
+export interface ThreatData {
+  // Core fields
+  riskScore: number;
+  riskLevel?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  input: string;
+  inputType?: "ip" | "url" | "domain" | "hash" | "email";
+  type?: string;
+  timestamp: string;
+  analysisDuration?: number;
+  analysisId?: string;
+
+  // Threat Intelligence Sources
+  vt?: VirusTotalData;
+  abuseipdb?: AbuseIPDBData;
+  otx?: OTXData;
+  greynoise?: GreyNoiseData;
+  pulsedive?: PulsediveData;
+  multirbl?: MultiRBLData;
+  ipinfo?: IPInfoData;
+  threatfox?: ThreatFoxData;
+  shodan?: ShodanData;
+  censys?: CensysData;
+  talos?: TalosData;
+  vpnapi?: VPNAPIData;
+  ipteoh?: IPTeohData;
+  malwareurl?: MalwareURLData;
+  iocone?: IOCOneData;
+  inquest?: InQuestData;
+  threatminer?: ThreatMinerData;
+  ipqualityscore?: IPQualityScoreData;
+  ipify?: IPifyData;
+
+  // URL-specific sources
+  urlscan?: URLScanData;
+  urlhaus?: URLHausData;
+  sucuri?: SucuriData;
+
+  // AI Summary
+  aiSummary?: AISummary;
+  aiSummaryMeta?: AISummaryMeta;
+}
+
+export interface AnalysisResponse {
+  success: boolean;
+  data: ThreatData;
+  error?: string;
+}
+
+export interface SearchHistoryItem {
+  input: string;
+  inputType: string;
+  riskScore: number;
+  riskLevel?: string;
+  timestamp: string;
+}
+
+// Component Props Types
+export interface ThreatSummaryCardProps {
+  data: ThreatData;
+  showActions?: boolean;
+  onExport?: () => void;
+  onCopy?: () => void;
+}
+
+export interface ThreatScoreGaugeProps {
+  score: number;
+  size?: "sm" | "md" | "lg";
+  showLabel?: boolean;
+}
+
+export interface SourceBadgeProps {
+  source: string;
+  status: "malicious" | "suspicious" | "clean" | "unknown";
+  score?: number;
+}
+
+// Utility type for API responses
+export interface APIErrorResponse {
+  success: false;
+  error: string;
+  statusCode?: number;
 }

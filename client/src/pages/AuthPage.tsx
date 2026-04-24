@@ -1,7 +1,8 @@
+// src/pages/AuthPage.tsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, LogIn, UserPlus, Sparkles } from "lucide-react";
+import { Shield, LogIn, UserPlus, Activity, Database, Zap } from "lucide-react";
 import { SignIn } from "../components/SignIn";
 import { SignUp } from "../components/SignUp";
 
@@ -14,7 +15,13 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {/* Ambient background with brand colors */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 -right-96 w-[600px] h-[600px] bg-brand-primary/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 -left-96 w-[600px] h-[600px] bg-brand-secondary/5 rounded-full blur-[120px]" />
+      </div>
+
       {/* Main Container */}
       <div className="relative w-full max-w-md">
         {/* Header with Logo */}
@@ -23,16 +30,19 @@ export const AuthPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <div className="flex justify-center mb-4">
+          {/* <div className="flex justify-center mb-4">
             <div className="relative">
-              <div className="absolute inset-0 bg-purple-500 rounded-full blur-xl opacity-50"></div>
-              <Shield className="relative h-16 w-16 text-purple-500" />
+              <div className="absolute inset-0 bg-brand-primary/30 rounded-full blur-xl" />
+              <div className="relative flex items-center justify-center w-20 h-20 bg-gradient-to-br from-brand-primary to-brand-primary-dark rounded-2xl shadow-lg">
+                <Shield className="h-10 w-10 text-white" strokeWidth={1.5} />
+              </div>
             </div>
-          </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+          </div> */}
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
             ThreatScope
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-sm text-muted-foreground mt-2 flex items-center justify-center gap-2">
+            <Activity className="h-3.5 w-3.5 text-brand-primary" />
             Advanced Threat Intelligence Platform
           </p>
         </motion.div>
@@ -42,15 +52,15 @@ export const AuthPage: React.FC = () => {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3 }}
-          className="bg-card/50 backdrop-blur-sm border border-border/30 shadow-2xl"
+          className="bg-card/80 backdrop-blur-sm border border-border/30 rounded-xl shadow-2xl overflow-hidden"
         >
           {/* Tab Headers */}
           <div className="flex border-b border-border/30">
             <button
               onClick={() => setIsSignIn(true)}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-all relative ${
+              className={`flex-1 py-3.5 px-4 text-sm font-medium transition-all relative ${
                 isSignIn
-                  ? "text-purple-500"
+                  ? "text-brand-primary"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -61,15 +71,15 @@ export const AuthPage: React.FC = () => {
               {isSignIn && (
                 <motion.div
                   layoutId="activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary"
                 />
               )}
             </button>
             <button
               onClick={() => setIsSignIn(false)}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-all relative ${
+              className={`flex-1 py-3.5 px-4 text-sm font-medium transition-all relative ${
                 !isSignIn
-                  ? "text-purple-500"
+                  ? "text-brand-primary"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -80,7 +90,7 @@ export const AuthPage: React.FC = () => {
               {!isSignIn && (
                 <motion.div
                   layoutId="activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary"
                 />
               )}
             </button>
@@ -109,16 +119,6 @@ export const AuthPage: React.FC = () => {
             </motion.div>
           </AnimatePresence>
         </motion.div>
-
-        {/* Footer */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-center text-xs text-muted-foreground mt-8"
-        >
-          Powered by 25+ Threat Intelligence Sources
-        </motion.p>
       </div>
     </div>
   );

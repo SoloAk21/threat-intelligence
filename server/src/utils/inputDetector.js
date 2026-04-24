@@ -1,37 +1,24 @@
 // src/utils/inputDetector.js
 const validator = require("validator");
 
-function detectInputType(input) {
-  if (!input || typeof input !== "string") return "unknown";
+const detectInputType = (input) => {
+  const trimmed = input.trim().toLowerCase();
 
-  const trimmed = input.trim();
-
-  // IP Address (IPv4)
+  // Check for IP address
   if (validator.isIP(trimmed)) {
     return "ip";
   }
 
-  // URL
-  if (validator.isURL(trimmed, { require_protocol: false })) {
-    return "url";
-  }
-
-  // Domain (FQDN)
-  if (validator.isFQDN(trimmed)) {
-    return "domain";
-  }
-
-  // Email (treat as email/username indicator)
+  // Check for email
   if (validator.isEmail(trimmed)) {
     return "email";
   }
 
-  // Hash detection
+  // Check for hash (MD5, SHA1, SHA256)
   const hashPatterns = {
     md5: /^[a-f0-9]{32}$/i,
     sha1: /^[a-f0-9]{40}$/i,
     sha256: /^[a-f0-9]{64}$/i,
-    sha512: /^[a-f0-9]{128}$/i,
   };
 
   for (const [type, pattern] of Object.entries(hashPatterns)) {
@@ -40,7 +27,24 @@ function detectInputType(input) {
     }
   }
 
+  // Check for URL
+  if (validator.isURL(trimmed, { require_protocol: false })) {
+    return "url";
+  }
+
+  // Check for domain (fallback for URLs without protocol)
+  const domainPattern =
+    /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+  if (domainPattern.test(trimmed)) {
+    return "domain";
+  }
+
+  // Default to domain if it looks like one
+  if (trimmed.includes(".") && !trimmed.includes(" ")) {
+    return "domain";
+  }
+
   return "unknown";
-}
+};
 
 module.exports = { detectInputType };

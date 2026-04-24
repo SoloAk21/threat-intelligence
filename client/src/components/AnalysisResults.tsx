@@ -24,6 +24,7 @@ import { InQuestCard } from "./cards/InQuestCard";
 import { URLScanCard } from "./cards/URLScanCard";
 import { URLHausCard } from "./cards/URLHausCard";
 import { SucuriCard } from "./cards/SucuriCard";
+import { log } from "console";
 
 export function AnalysisResults({ data }: { data: ThreatData }) {
   const inputType = data.inputType || "ip";
@@ -31,6 +32,7 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
   const isURL = inputType === "url";
   const isDomain = inputType === "domain";
   const isHash = inputType === "hash";
+  console.log("ThreatData", data);
 
   const availableCards = [
     // VirusTotal (always show if available)

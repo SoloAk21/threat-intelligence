@@ -1,3 +1,4 @@
+// src/store/authStore.ts
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
@@ -51,6 +52,12 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const data = await response.json();
+          console.log("Login response:", {
+            token: data.token,
+            user: data.user,
+          }); // Debug log
+
+          // Save token and user
           set({
             user: data.user,
             token: data.token,
@@ -58,6 +65,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
         } catch (error) {
+          console.error("Login error:", error);
           set({ isLoading: false });
           throw error;
         }
@@ -78,6 +86,11 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const data = await response.json();
+          console.log("Signup response:", {
+            token: data.token,
+            user: data.user,
+          }); // Debug log
+
           set({
             user: data.user,
             token: data.token,
@@ -85,6 +98,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
         } catch (error) {
+          console.error("Signup error:", error);
           set({ isLoading: false });
           throw error;
         }
@@ -96,6 +110,7 @@ export const useAuthStore = create<AuthState>()(
           token: null,
           isAuthenticated: false,
         });
+        // Clear all storage
         localStorage.removeItem("auth-storage");
       },
 
@@ -155,7 +170,12 @@ export const useAuthStore = create<AuthState>()(
 
       checkAuth: async () => {
         const { token, isAuthenticated } = get();
-        if (!token || !isAuthenticated) return;
+        console.log("Checking auth:", { hasToken: !!token, isAuthenticated }); // Debug log
+
+        if (!token || !isAuthenticated) {
+          console.log("No token or not authenticated");
+          return;
+        }
 
         try {
           const response = await fetch(`${API_URL}/auth/me`, {
@@ -167,18 +187,22 @@ export const useAuthStore = create<AuthState>()(
           if (response.ok) {
             const data = await response.json();
             set({ user: data.user, isAuthenticated: true });
+            console.log("Auth check successful:", data.user);
           } else {
+            console.log("Auth check failed, clearing state");
             set({ user: null, token: null, isAuthenticated: false });
             localStorage.removeItem("auth-storage");
           }
         } catch (error) {
           console.error("Auth check failed:", error);
+          set({ user: null, token: null, isAuthenticated: false });
+          localStorage.removeItem("auth-storage");
         }
       },
     }),
     {
       name: "auth-storage",
-      storage: createJSONStorage(() => localStorage), // ✅ Fixed: Use createJSONStorage
+      storage: createJSONStorage(() => localStorage),
     },
   ),
 );

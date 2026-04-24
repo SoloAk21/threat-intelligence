@@ -1,6 +1,21 @@
+// src/lib/api.ts
 import axios from "axios";
 import type { ThreatData } from "@/types/threat";
 import { detectInputType } from "./inputDetector";
+
+// Get token from localStorage
+const getToken = () => {
+  const authStorage = localStorage.getItem("auth-storage");
+  if (authStorage) {
+    try {
+      const parsed = JSON.parse(authStorage);
+      return parsed.state?.token || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+};
 
 // Create axios instance
 const api = axios.create({
@@ -9,10 +24,32 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Response interceptor (error handling)
+// ✅ Request interceptor to add token to every request
+api.interceptors.request.use(
+  (config) => {
+    const token = getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      console.warn("No token found for request:", config.url);
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+// Response interceptor for error handling
 api.interceptors.response.use(
   (res) => res,
   (error) => {
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401) {
+      console.error("Authentication error - redirecting to login");
+      localStorage.removeItem("auth-storage");
+      window.location.href = "/auth";
+      return Promise.reject(new Error("Session expired. Please login again."));
+    }
+
     if (error.code === "ECONNABORTED") {
       return Promise.reject(new Error("Request timed out. Please try again."));
     }
@@ -28,7 +65,6 @@ api.interceptors.response.use(
   },
 );
 
-// ✅ Fixed analyzeInput function
 export async function analyzeInput(
   input: string,
 ): Promise<{ success: boolean; data: ThreatData }> {
@@ -41,3 +77,6 @@ export async function analyzeInput(
 
   return response.data;
 }
+
+// Export the api instance for other services
+export { api };

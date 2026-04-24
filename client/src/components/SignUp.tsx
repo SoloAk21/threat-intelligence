@@ -1,3 +1,4 @@
+// src/components/SignUp.tsx
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "../store/authStore";
@@ -12,6 +13,7 @@ import {
   AlertCircle,
   ShieldCheck,
   CheckCircle,
+  UserPlus,
 } from "lucide-react";
 
 interface SignUpProps {
@@ -125,14 +127,14 @@ export const SignUp: React.FC<SignUpProps> = ({
             Username
           </Label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-primary/40" />
             <Input
               id="username"
               type="text"
               placeholder="johndoe"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="pl-9 bg-background/50 border-border/30 focus:border-purple-500/50 text-sm"
+              className="pl-9 bg-background/50 border-border/30 focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/20 text-sm"
               required
               minLength={3}
               maxLength={30}
@@ -148,14 +150,14 @@ export const SignUp: React.FC<SignUpProps> = ({
             Email Address
           </Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-primary/40" />
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="pl-9 bg-background/50 border-border/30 focus:border-purple-500/50 text-sm"
+              className="pl-9 bg-background/50 border-border/30 focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/20 text-sm"
               required
             />
           </div>
@@ -169,14 +171,14 @@ export const SignUp: React.FC<SignUpProps> = ({
             Password
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-primary/40" />
             <Input
               id="password"
               type="password"
               placeholder="••••••"
               value={password}
               onChange={(e) => handlePasswordChange(e.target.value)}
-              className="pl-9 bg-background/50 border-border/30 focus:border-purple-500/50 text-sm"
+              className="pl-9 bg-background/50 border-border/30 focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/20 text-sm"
               required
               minLength={6}
             />
@@ -236,14 +238,14 @@ export const SignUp: React.FC<SignUpProps> = ({
             Confirm Password
           </Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-brand-primary/40" />
             <Input
               id="confirmPassword"
               type="password"
               placeholder="••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="pl-9 bg-background/50 border-border/30 focus:border-purple-500/50 text-sm"
+              className="pl-9 bg-background/50 border-border/30 focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/20 text-sm"
               required
             />
           </div>
@@ -256,7 +258,7 @@ export const SignUp: React.FC<SignUpProps> = ({
 
         <Button
           type="submit"
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-2 transition-all duration-200 mt-4"
+          className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white text-sm font-medium py-2 transition-all duration-200 mt-4"
           disabled={isLoading}
         >
           {isLoading ? (
@@ -266,7 +268,7 @@ export const SignUp: React.FC<SignUpProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" />
+              <UserPlus className="h-4 w-4" />
               <span>Create Account</span>
             </div>
           )}
@@ -286,9 +288,9 @@ export const SignUp: React.FC<SignUpProps> = ({
         <button
           type="button"
           onClick={onSwitchToSignIn}
-          className="w-full text-center text-sm text-purple-500 hover:text-purple-400 transition-colors"
+          className="w-full text-center text-sm text-brand-primary hover:text-brand-primary/80 transition-colors font-medium"
         >
-          Sign in instead
+          Sign in instead →
         </button>
       </form>
     </div>
