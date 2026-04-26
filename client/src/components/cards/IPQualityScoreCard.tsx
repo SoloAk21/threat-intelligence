@@ -13,13 +13,13 @@ import {
   Mail,
   CreditCard,
   AlertCircle,
-  Globe,
 } from "lucide-react";
 import type { IPQualityScoreData } from "@/types/threat";
 
 export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
   const [expanded, setExpanded] = useState(false);
 
+  // Check for API error (insufficient credits, etc.)
   const hasError = data.raw?.success === false;
   const errorMessage = data.raw?.message || "";
 
@@ -58,11 +58,14 @@ export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
     );
   }
 
-  const fraudScore = data.fraud_score || 0;
-  const isVPN = data.vpn || false;
-  const isProxy = data.proxy || false;
-  const isTor = data.tor || false;
-  const isBlacklisted = data.recent_abuse || false;
+  const fraudScore = data.fraud_score ?? 0;
+  const isVPN = data.vpn ?? false;
+  const isProxy = data.proxy ?? false;
+  const isTor = data.tor ?? false;
+  const isBlacklisted = data.recent_abuse ?? false;
+  const isBot = data.bot_status ?? false;
+  const isCrawler = data.is_crawler ?? false;
+  const isMobile = data.mobile ?? false;
 
   const getRiskColor = () => {
     if (fraudScore >= 75) return "text-red-500";
@@ -85,9 +88,24 @@ export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
     return "Low";
   };
 
+  const getBarColor = () => {
+    if (fraudScore >= 75) return "bg-red-500";
+    if (fraudScore >= 50) return "bg-orange-500";
+    if (fraudScore >= 25) return "bg-yellow-500";
+    return "bg-green-500";
+  };
+
   const riskColor = getRiskColor();
   const riskBg = getRiskBg();
   const riskLevel = getRiskLevel();
+  const barColor = getBarColor();
+
+  // Get ISP from direct property (data.isp exists in your JSON)
+  const isp = data.isp || "Unknown";
+
+  // Note: The IP address is not available in the IPQS data structure
+  // The view link will use a generic URL since we don't have the IP
+  const viewUrl = "https://www.ipqualityscore.com/ip-reputation-check";
 
   return (
     <div className="bg-card border-l-2 border-purple-500/60">
@@ -150,21 +168,16 @@ export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">ISP:</span>
               <span className="text-foreground/80 truncate max-w-[180px]">
-                {data.isp || data.raw?.isp || "Unknown"}
+                {isp}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-muted-foreground">
-              {data.raw?.country || "Unknown"}
-            </span>
+            <span className="text-muted-foreground">Score: {fraudScore}</span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                window.open(
-                  `https://www.ipqualityscore.com/ip-reputation-check/${data.raw?.ip || ""}`,
-                  "_blank",
-                );
+                window.open(viewUrl, "_blank");
               }}
               className="text-purple-500/70 hover:text-purple-500 flex items-center gap-0.5"
             >
@@ -178,7 +191,7 @@ export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
       {expanded && (
         <div className="p-3">
           {/* Fraud Score Bar */}
-          <div className="flex items-center gap-3 mb-2 pb-2 border-b border-border/20">
+          <div className="flex items-center gap-3 mb-3 pb-2 border-b border-border/20">
             <div className="flex items-center gap-3 flex-1">
               <div className="flex items-center gap-1">
                 <AlertCircle
@@ -190,7 +203,7 @@ export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
               </div>
               <div className="flex-1 h-2 bg-muted/30 rounded-full max-w-[200px]">
                 <div
-                  className={`h-full rounded-full ${fraudScore >= 75 ? "bg-red-500" : fraudScore >= 50 ? "bg-orange-500" : fraudScore >= 25 ? "bg-yellow-500" : "bg-green-500"}`}
+                  className={`h-full rounded-full ${barColor}`}
                   style={{ width: `${fraudScore}%` }}
                 />
               </div>
@@ -201,7 +214,7 @@ export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
           </div>
 
           {/* Security Indicators Grid */}
-          <div className="grid grid-cols-4 gap-0.5 mb-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-0.5 mb-3">
             <div className="px-1 py-1.5 bg-muted/5 border border-border/10 rounded text-center">
               <Wifi
                 className={`h-3 w-3 mx-auto mb-0.5 ${isVPN ? "text-orange-500" : "text-green-500"}`}
@@ -256,37 +269,31 @@ export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
             </div>
           </div>
 
-          {/* Location Details */}
-          <div className="space-y-0.5 mb-2">
-            <div className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-wider mb-0.5">
-              Geolocation
+          {/* Additional Status Indicators */}
+          {(isBot || isCrawler || isMobile) && (
+            <div className="flex flex-wrap gap-1 mb-3">
+              {isBot && (
+                <span className="text-[8px] px-1.5 py-0.5 bg-purple-500/10 text-purple-500 border border-purple-500/20 font-mono">
+                  Bot Detected
+                </span>
+              )}
+              {isCrawler && (
+                <span className="text-[8px] px-1.5 py-0.5 bg-blue-500/10 text-blue-500 border border-blue-500/20 font-mono">
+                  Crawler
+                </span>
+              )}
+              {isMobile && (
+                <span className="text-[8px] px-1.5 py-0.5 bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 font-mono">
+                  Mobile Network
+                </span>
+              )}
             </div>
-            <div className="space-y-0">
-              <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
-                <MapPin className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
-                <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
-                  Country
-                </span>
-                <span className="text-[10px] font-medium text-foreground truncate ml-1">
-                  {data.raw?.country || "N/A"}
-                </span>
-              </div>
-              <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
-                <MapPin className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
-                <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
-                  City
-                </span>
-                <span className="text-[10px] font-medium text-foreground truncate ml-1">
-                  {data.raw?.city || "N/A"}
-                </span>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Network Details */}
           <div className="space-y-0.5">
             <div className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-wider mb-0.5">
-              Network
+              Network Information
             </div>
             <div className="space-y-0">
               <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
@@ -295,24 +302,60 @@ export function IPQualityScoreCard({ data }: { data: IPQualityScoreData }) {
                   ISP
                 </span>
                 <span className="text-[10px] font-medium text-foreground truncate ml-1">
-                  {data.isp || data.raw?.isp || "N/A"}
+                  {isp}
                 </span>
               </div>
+              {data.organization && (
+                <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
+                  <Server className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
+                  <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
+                    Organization
+                  </span>
+                  <span className="text-[10px] font-medium text-foreground truncate ml-1">
+                    {data.organization}
+                  </span>
+                </div>
+              )}
+              {data.asn && (
+                <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
+                  <Server className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
+                  <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
+                    ASN
+                  </span>
+                  <span className="text-[10px] font-medium text-foreground truncate ml-1">
+                    {data.asn}
+                  </span>
+                </div>
+              )}
+              {data.hostname && (
+                <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
+                  <Server className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
+                  <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
+                    Hostname
+                  </span>
+                  <span className="text-[10px] font-medium text-foreground truncate ml-1">
+                    {data.hostname}
+                  </span>
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Note about insufficient data */}
+          <div className="mt-3 p-2 bg-yellow-500/5 border border-yellow-500/20 text-center">
+            <p className="text-[8px] text-muted-foreground">
+              Note: IP address lookup URL not available. Visit IPQS website
+              directly for detailed reports.
+            </p>
           </div>
 
           {/* View Report Button */}
           <button
-            onClick={() =>
-              window.open(
-                `https://www.ipqualityscore.com/ip-reputation-check/${data.raw?.ip || ""}`,
-                "_blank",
-              )
-            }
+            onClick={() => window.open(viewUrl, "_blank")}
             className="w-full mt-3 py-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-500 text-[10px] font-medium hover:bg-purple-500/20 transition-colors flex items-center justify-center gap-1"
           >
             <ExternalLink className="h-3 w-3" />
-            Full Report on IPQS
+            Visit IPQualityScore
           </button>
         </div>
       )}

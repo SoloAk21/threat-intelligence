@@ -28,28 +28,31 @@ import type { GreyNoiseData } from "@/types/threat";
 export function GreyNoiseCard({ data }: { data: GreyNoiseData }) {
   const [expanded, setExpanded] = useState(false);
 
-  const classification = data.classification || "unknown";
-  const isNoise = data.noise;
-  const isVPN = data.vpn || false;
-  const isProxy = data.proxy || false;
-  const isTor = data.tor || false;
-  const isBot = data.bot || false;
-  const isMobile = data.mobile || false;
-  const isDatacenter = data.datacenter || false;
+  // Add null checks with fallbacks
+  const classification = data?.classification || "unknown";
+  const isNoise = data?.noise ?? false;
+  const isVPN = data?.vpn ?? false;
+  const isProxy = data?.proxy ?? false;
+  const isTor = data?.tor ?? false;
+  const isBot = data?.bot ?? false;
+  const isMobile = data?.mobile ?? false;
+  const isDatacenter = data?.datacenter ?? false;
+  const riot = data?.riot ?? false;
+  const seen = data?.seen ?? data?.raw?.seen ?? false;
 
-  const ipAddress = data.ip || data.raw?.ip || "Unknown";
-  const organization = data.raw?.organization || data.organization || "Unknown";
-  const asn = data.raw?.asn || data.asn || "Unknown";
-  const country = data.raw?.country || data.country || "Unknown";
-  const countryCode = data.raw?.country_code || data.countryCode || "Unknown";
-  const city = data.raw?.city || data.city || "Unknown";
-  const firstSeen = data.raw?.first_seen || data.firstSeen;
-  const lastSeen = data.raw?.last_seen || data.lastSeen;
-  const tags = data.tags || data.raw?.tags || [];
-  const cve = data.raw?.cve || data.cve || [];
-  const link = data.raw?.link || data.link;
-  const riot = data.raw?.riot || data.riot || false;
-  const seen = data.seen || data.raw?.seen || false;
+  const ipAddress = data?.ip || data?.raw?.ip || "Unknown";
+  const organization =
+    data?.organization || data?.raw?.organization || "Unknown";
+  const asn = data?.asn || data?.raw?.asn || "Unknown";
+  const country = data?.country || data?.raw?.location?.country || "Unknown";
+  const countryCode =
+    data?.country_code || data?.raw?.location?.country_code || "Unknown";
+  const city = data?.city || data?.raw?.location?.city || "Unknown";
+  const firstSeen = data?.first_seen || data?.raw?.first_seen;
+  const lastSeen = data?.last_seen || data?.raw?.last_seen;
+  const tags = data?.tags || data?.raw?.tags || [];
+  const cve = data?.cve || data?.raw?.cve || [];
+  const link = data?.link || data?.raw?.link;
 
   const getClassificationConfig = () => {
     switch (classification) {

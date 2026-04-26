@@ -1,4 +1,4 @@
-// src/components/cards/AbuseIPDBCard.tsx - Branded Version (No Rounded Corners)
+// src/components/cards/AbuseIPDBCard.tsx
 import { useState } from "react";
 import {
   Shield,
@@ -12,8 +12,6 @@ import {
   Users,
   Flag,
   Clock,
-  Hash,
-  Mail,
   Building,
   MapPin,
   Activity,
@@ -30,8 +28,6 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
   const isp = data.raw?.isp || data.isp || "Unknown";
   const usageType = data.raw?.usageType || data.usageType || "Unknown";
   const domain = data.raw?.domain || data.domain || "Unknown";
-  const countryCode = data.country || data.raw?.countryCode || "Unknown";
-  const countryName = data.raw?.countryName || data.country || countryCode;
   const lastReportedAt = data.raw?.lastReportedAt;
   const numDistinctUsers = data.raw?.numDistinctUsers;
   const isWhitelisted = data.raw?.isWhitelisted || false;
@@ -95,10 +91,10 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
   };
 
   const getRiskLevel = () => {
-    if (score >= 75) return "Critical";
-    if (score >= 50) return "High";
-    if (score >= 25) return "Medium";
-    return "Low";
+    if (score >= 75) return "CRITICAL";
+    if (score >= 50) return "HIGH";
+    if (score >= 25) return "MEDIUM";
+    return "LOW";
   };
 
   const getCategoryColor = (category: number) => {
@@ -108,7 +104,7 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
       return "bg-risk-critical/20 text-risk-critical border-risk-critical/30";
     if (mediumRisk.includes(category))
       return "bg-risk-high/20 text-risk-high border-risk-high/30";
-    return "bg-risk-medium/20 text-risk-medium border-risk-medium/30";
+    return "bg-brand-primary/20 text-brand-primary border-brand-primary/30";
   };
 
   const formatDate = (dateStr: string) => {
@@ -131,15 +127,38 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
   const displayedReports = showAllReports ? reports : reports.slice(0, 5);
 
   return (
-    <div className="bg-card border-l-2 border-l-risk-critical border border-border/50 group">
+    <div className="bg-card border-l-2 border-risk-critical/60 transition-all duration-300 hover:border-risk-critical/80">
+      <style>
+        {`
+          .abuse-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+          }
+          .abuse-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .abuse-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(12, 183, 183, 0.2);
+            border-radius: 0;
+          }
+          .abuse-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(12, 183, 183, 0.4);
+          }
+          .abuse-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(12, 183, 183, 0.2) transparent;
+          }
+        `}
+      </style>
+
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-1.5 border-b border-border/20 flex items-center gap-2 bg-gradient-to-r from-risk-critical/5 to-transparent hover:from-risk-critical/10 transition-all duration-200 text-left"
+        className="w-full px-3 py-1.5 border-b border-border/20 flex items-center gap-2 bg-gradient-to-r from-risk-critical/5 to-transparent hover:from-risk-critical/10 transition-all duration-200"
       >
         <div className="flex items-center gap-1.5">
           <div className="p-0.5 bg-risk-critical/10">
-            <Shield className="h-3 w-3 text-risk-critical" />
+            <Shield className="h-3 w-3 text-risk-critical" strokeWidth={2} />
           </div>
           <span className="text-[11px] font-semibold tracking-tight text-foreground/80 uppercase">
             AbuseIPDB
@@ -192,7 +211,7 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
 
       {/* Collapsed Summary */}
       {!expanded && (
-        <div className="px-3 py-2 flex items-center justify-between text-[9px]">
+        <div className="px-3 py-2 flex items-center justify-between text-[9px] bg-brand-primary/3">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">ISP:</span>
@@ -202,7 +221,7 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
             </div>
             {numDistinctUsers && (
               <div className="flex items-center gap-1">
-                <Users className="h-2.5 w-2.5 text-muted-foreground/40" />
+                <Users className="h-2.5 w-2.5 text-brand-primary/40" />
                 <span className="text-muted-foreground">
                   {numDistinctUsers} reporters
                 </span>
@@ -212,7 +231,7 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
           <div className="flex items-center gap-3">
             <span className="text-muted-foreground flex items-center gap-0.5">
               <MapPin className="h-2.5 w-2.5" />
-              {countryCode}
+              {/* {countryCode} */}
             </span>
             {lastReportedAt && (
               <span className="text-muted-foreground/60 flex items-center gap-0.5">
@@ -238,9 +257,9 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
       )}
 
       {expanded && (
-        <div className="p-3 space-y-2">
+        <div className="p-3 space-y-3">
           {/* Confidence Score Bar */}
-          <div className="flex items-center gap-3 mb-2 pb-2 border-b border-border/20">
+          <div className="flex items-center gap-3 pb-2 border-b border-border/20">
             <div className="flex items-center gap-3 flex-1">
               <div className="flex items-center gap-1">
                 <AlertTriangle
@@ -271,7 +290,7 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
           </div>
 
           {/* Key Metrics Grid */}
-          <div className="grid grid-cols-4 gap-0.5 mb-2">
+          <div className="grid grid-cols-4 gap-0.5">
             <div className="px-1.5 py-1.5 bg-muted/5 border border-border/10">
               <div className="text-[8px] font-medium text-muted-foreground uppercase tracking-wider">
                 Reports
@@ -309,15 +328,15 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
           </div>
 
           {/* Network Information */}
-          <div className="space-y-0.5 mb-2">
-            <div className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-wider flex items-center gap-1 mb-1">
+          <div>
+            <div className="text-[9px] font-semibold text-brand-primary/70 uppercase tracking-wider flex items-center gap-1 mb-1">
               <Server className="h-2.5 w-2.5" />
               Network Information
             </div>
             <div className="space-y-0">
-              <div className="flex items-center py-0.5 px-1.5 hover:bg-muted/5 transition-colors">
+              <div className="flex items-center py-0.5 px-1.5 hover:bg-brand-primary/5 transition-colors">
                 <div className="flex items-center gap-2 flex-shrink-0 w-20">
-                  <Building className="h-3 w-3 text-muted-foreground/40" />
+                  <Building className="h-3 w-3 text-brand-primary/40" />
                   <span className="text-[10px] text-muted-foreground">ISP</span>
                 </div>
                 <span className="text-[10px] font-medium text-foreground truncate">
@@ -325,9 +344,9 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
                 </span>
               </div>
               {domain !== "Unknown" && (
-                <div className="flex items-center py-0.5 px-1.5 hover:bg-muted/5 transition-colors">
+                <div className="flex items-center py-0.5 px-1.5 hover:bg-brand-primary/5 transition-colors">
                   <div className="flex items-center gap-2 flex-shrink-0 w-20">
-                    <Globe className="h-3 w-3 text-muted-foreground/40" />
+                    <Globe className="h-3 w-3 text-brand-primary/40" />
                     <span className="text-[10px] text-muted-foreground">
                       Domain
                     </span>
@@ -337,9 +356,9 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
                   </span>
                 </div>
               )}
-              <div className="flex items-center py-0.5 px-1.5 hover:bg-muted/5 transition-colors">
+              <div className="flex items-center py-0.5 px-1.5 hover:bg-brand-primary/5 transition-colors">
                 <div className="flex items-center gap-2 flex-shrink-0 w-20">
-                  <Flag className="h-3 w-3 text-muted-foreground/40" />
+                  <Flag className="h-3 w-3 text-brand-primary/40" />
                   <span className="text-[10px] text-muted-foreground">
                     Usage
                   </span>
@@ -353,8 +372,8 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
 
           {/* Top Categories */}
           {topCategories.length > 0 && (
-            <div className="mb-2">
-              <div className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-wider mb-1">
+            <div>
+              <div className="text-[9px] font-semibold text-brand-primary/70 uppercase tracking-wider mb-1">
                 Top Categories
               </div>
               <div className="flex flex-wrap gap-1">
@@ -370,31 +389,17 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
             </div>
           )}
 
-          {/* Status Tags */}
-          <div className="flex items-center gap-2 mb-2">
-            {isWhitelisted && (
-              <span className="text-[9px] px-1.5 py-0.5 bg-risk-low/10 text-risk-low border border-risk-low/30">
-                ✓ Whitelisted
-              </span>
-            )}
-            {isTor && (
-              <span className="text-[9px] px-1.5 py-0.5 bg-purple-500/10 text-purple-500 border border-purple-500/30">
-                🧅 TOR Exit Node
-              </span>
-            )}
-          </div>
-
           {/* Reports Section */}
           {reports.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-border/20">
+            <div className="pt-2 border-t border-border/20">
               <div className="flex items-center justify-between mb-1">
-                <div className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+                <div className="text-[9px] font-semibold text-brand-primary/70 uppercase tracking-wider">
                   Recent Reports ({reports.length})
                 </div>
                 {reports.length > 5 && (
                   <button
                     onClick={() => setShowAllReports(!showAllReports)}
-                    className="text-[9px] text-risk-critical/70 hover:text-risk-critical transition-colors"
+                    className="text-[9px] text-brand-primary/70 hover:text-brand-primary transition-colors"
                   >
                     {showAllReports
                       ? "Show Less"
@@ -402,7 +407,7 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
                   </button>
                 )}
               </div>
-              <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+              <div className="space-y-1 max-h-[200px] overflow-y-auto abuse-scrollbar">
                 {displayedReports.map((report: any, idx: number) => (
                   <div
                     key={idx}
@@ -430,11 +435,6 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
                           ))}
                         </div>
                       )}
-                      {report.reporterCountry && (
-                        <span className="text-[8px] text-muted-foreground/50 ml-auto">
-                          {report.reporterCountry}
-                        </span>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -443,7 +443,7 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2 mt-3">
+          <div className="flex gap-2 mt-1">
             <button
               onClick={() =>
                 window.open(
@@ -451,9 +451,9 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
                   "_blank",
                 )
               }
-              className="flex-1 py-1.5 bg-risk-critical/10 border border-risk-critical/30 text-risk-critical text-[10px] font-medium hover:bg-risk-critical/20 transition-all duration-200 flex items-center justify-center gap-1"
+              className="flex-1 py-1.5 bg-risk-critical/10 border border-risk-critical/30 text-risk-critical text-[10px] font-medium hover:bg-risk-critical/20 transition-all duration-200 flex items-center justify-center gap-1.5 group"
             >
-              <ExternalLink className="h-3 w-3" />
+              <ExternalLink className="h-3 w-3 group-hover:scale-105 transition-transform" />
               View Full Report
             </button>
             <button
@@ -463,9 +463,9 @@ export function AbuseIPDBCard({ data }: { data: AbuseIPDBData }) {
                   "_blank",
                 )
               }
-              className="flex-1 py-1.5 border border-border/30 hover:bg-muted/10 text-[10px] font-medium transition-all duration-200 flex items-center justify-center gap-1"
+              className="flex-1 py-1.5 border border-border/30 hover:bg-brand-primary/10 text-[10px] font-medium transition-all duration-200 flex items-center justify-center gap-1.5 group"
             >
-              <AlertTriangle className="h-3 w-3" />
+              <AlertTriangle className="h-3 w-3 group-hover:scale-105 transition-transform" />
               Report This IP
             </button>
           </div>

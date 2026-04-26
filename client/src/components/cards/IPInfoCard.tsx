@@ -21,14 +21,26 @@ export function IPInfoCard({ data }: { data: IPInfoData }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const geo = data.geo || {};
-  const as = data.as || {};
-
   const copyIP = () => {
     navigator.clipboard.writeText(data.ip);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // Check if any of the privacy indicators exist
+  const hasPrivacyData = data.privacy && Object.keys(data.privacy).length > 0;
+
+  // Determine hosting status from privacy.hosting or fallback to false
+  const isHosting = data.privacy?.hosting ?? false;
+  const isAnonymous =
+    data.privacy?.vpn ?? data.privacy?.proxy ?? data.privacy?.tor ?? false;
+  const isAnycast = data.raw?.anycast ?? false;
+  const isMobile = false; // Not available in standard IPinfo data
+
+  // Get org name from org field (format: "AS15169 Google LLC")
+  const orgName =
+    data.org?.replace(/^AS\d+\s/, "") || data.org_name || "Unknown";
+  const asn = data.asn || data.org?.match(/AS(\d+)/)?.[1] || "N/A";
 
   return (
     <div className="bg-card border-l-2 border-blue-500/60">
@@ -67,7 +79,7 @@ export function IPInfoCard({ data }: { data: IPInfoData }) {
           </span>
         </div>
         <span className="text-[9px] text-muted-foreground/50 px-1.5 py-0.5 bg-muted/30">
-          {data.is_hosting ? "Hosting" : "Residential"}
+          {isHosting ? "Hosting" : "Residential"}
         </span>
 
         <div className="flex items-center gap-1 ml-auto">
@@ -86,13 +98,13 @@ export function IPInfoCard({ data }: { data: IPInfoData }) {
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Org:</span>
               <span className="text-foreground/80 truncate max-w-[180px]">
-                {as.name || data.org || "Unknown"}
+                {orgName}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-muted-foreground">
-              {geo.country || data.country || "Unknown"}
+              {data.country || "Unknown"}
             </span>
             <button
               onClick={(e) => {
@@ -138,54 +150,54 @@ export function IPInfoCard({ data }: { data: IPInfoData }) {
           <div className="grid grid-cols-4 gap-0.5 mb-2">
             <div className="px-1 py-1.5 bg-muted/5 border border-border/10 rounded text-center">
               <Server
-                className={`h-3 w-3 mx-auto mb-0.5 ${data.is_hosting ? "text-yellow-500" : "text-green-500"}`}
+                className={`h-3 w-3 mx-auto mb-0.5 ${isHosting ? "text-yellow-500" : "text-green-500"}`}
               />
               <div className="text-[8px] font-medium text-muted-foreground uppercase">
                 Hosting
               </div>
               <div
-                className={`text-[9px] font-bold ${data.is_hosting ? "text-yellow-500" : "text-green-500"}`}
+                className={`text-[9px] font-bold ${isHosting ? "text-yellow-500" : "text-green-500"}`}
               >
-                {data.is_hosting ? "YES" : "NO"}
+                {isHosting ? "YES" : "NO"}
               </div>
             </div>
             <div className="px-1 py-1.5 bg-muted/5 border border-border/10 rounded text-center">
               <Eye
-                className={`h-3 w-3 mx-auto mb-0.5 ${data.is_anonymous ? "text-red-500" : "text-green-500"}`}
+                className={`h-3 w-3 mx-auto mb-0.5 ${isAnonymous ? "text-red-500" : "text-green-500"}`}
               />
               <div className="text-[8px] font-medium text-muted-foreground uppercase">
                 Anon
               </div>
               <div
-                className={`text-[9px] font-bold ${data.is_anonymous ? "text-red-500" : "text-green-500"}`}
+                className={`text-[9px] font-bold ${isAnonymous ? "text-red-500" : "text-green-500"}`}
               >
-                {data.is_anonymous ? "YES" : "NO"}
+                {isAnonymous ? "YES" : "NO"}
               </div>
             </div>
             <div className="px-1 py-1.5 bg-muted/5 border border-border/10 rounded text-center">
               <Activity
-                className={`h-3 w-3 mx-auto mb-0.5 ${data.is_anycast ? "text-blue-500" : "text-muted-foreground"}`}
+                className={`h-3 w-3 mx-auto mb-0.5 ${isAnycast ? "text-blue-500" : "text-muted-foreground"}`}
               />
               <div className="text-[8px] font-medium text-muted-foreground uppercase">
                 Anycast
               </div>
               <div
-                className={`text-[9px] font-bold ${data.is_anycast ? "text-blue-500" : "text-muted-foreground"}`}
+                className={`text-[9px] font-bold ${isAnycast ? "text-blue-500" : "text-muted-foreground"}`}
               >
-                {data.is_anycast ? "YES" : "NO"}
+                {isAnycast ? "YES" : "NO"}
               </div>
             </div>
             <div className="px-1 py-1.5 bg-muted/5 border border-border/10 rounded text-center">
               <Smartphone
-                className={`h-3 w-3 mx-auto mb-0.5 ${data.is_mobile ? "text-cyan-500" : "text-muted-foreground"}`}
+                className={`h-3 w-3 mx-auto mb-0.5 ${isMobile ? "text-cyan-500" : "text-muted-foreground"}`}
               />
               <div className="text-[8px] font-medium text-muted-foreground uppercase">
                 Mobile
               </div>
               <div
-                className={`text-[9px] font-bold ${data.is_mobile ? "text-cyan-500" : "text-muted-foreground"}`}
+                className={`text-[9px] font-bold ${isMobile ? "text-cyan-500" : "text-muted-foreground"}`}
               >
-                {data.is_mobile ? "YES" : "NO"}
+                {isMobile ? "YES" : "NO"}
               </div>
             </div>
           </div>
@@ -202,7 +214,16 @@ export function IPInfoCard({ data }: { data: IPInfoData }) {
                   Country
                 </span>
                 <span className="text-[10px] font-medium text-foreground truncate ml-1">
-                  {geo.country || data.country || "N/A"}
+                  {data.country || "N/A"}
+                </span>
+              </div>
+              <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
+                <MapPin className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
+                <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
+                  Region
+                </span>
+                <span className="text-[10px] font-medium text-foreground truncate ml-1">
+                  {data.region || "N/A"}
                 </span>
               </div>
               <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
@@ -211,9 +232,31 @@ export function IPInfoCard({ data }: { data: IPInfoData }) {
                   City
                 </span>
                 <span className="text-[10px] font-medium text-foreground truncate ml-1">
-                  {geo.city || data.city || "N/A"}
+                  {data.city || "N/A"}
                 </span>
               </div>
+              {data.loc && (
+                <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
+                  <MapPin className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
+                  <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
+                    Coordinates
+                  </span>
+                  <span className="text-[10px] font-medium text-foreground truncate ml-1">
+                    {data.loc}
+                  </span>
+                </div>
+              )}
+              {data.timezone && (
+                <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
+                  <MapPin className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
+                  <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
+                    Timezone
+                  </span>
+                  <span className="text-[10px] font-medium text-foreground truncate ml-1">
+                    {data.timezone}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -226,10 +269,10 @@ export function IPInfoCard({ data }: { data: IPInfoData }) {
               <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
                 <Building2 className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
                 <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
-                  Org
+                  Organization
                 </span>
                 <span className="text-[10px] font-medium text-foreground truncate ml-1">
-                  {as.name || data.org || "N/A"}
+                  {orgName}
                 </span>
               </div>
               <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
@@ -238,9 +281,20 @@ export function IPInfoCard({ data }: { data: IPInfoData }) {
                   ASN
                 </span>
                 <span className="text-[10px] font-medium text-foreground truncate ml-1">
-                  {as.asn || "N/A"}
+                  {asn}
                 </span>
               </div>
+              {data.postal && (
+                <div className="flex items-center py-0.5 px-1 hover:bg-muted/5 transition-colors rounded">
+                  <Network className="h-3 w-3 text-muted-foreground/40 mr-1.5 flex-shrink-0" />
+                  <span className="text-[10px] text-muted-foreground w-12 flex-shrink-0">
+                    Postal
+                  </span>
+                  <span className="text-[10px] font-medium text-foreground truncate ml-1">
+                    {data.postal}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

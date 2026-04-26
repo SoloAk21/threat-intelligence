@@ -21,7 +21,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useState } from "react";
-import type { ThreatData } from "@/types/threat";
+import type { ThreatData, MultiRBLList } from "@/types/threat";
 
 interface BrowserLeaksCardProps {
   data: ThreatData;
@@ -71,6 +71,14 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
     if (data.riskScore >= 40) return "Medium";
     return "Low";
   };
+
+  // Safe access helper for vt data
+  const vtData = data.vt;
+  const abuseipdbData = data.abuseipdb;
+  const ipinfoData = data.ipinfo;
+  const vpnapiData = data.vpnapi;
+  const multirblData = data.multirbl;
+  const otxData = data.otx;
 
   return (
     <div className="bg-surface-0 border-l-4 border-brand-primary shadow-md">
@@ -126,20 +134,20 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
               <span className="text-muted-foreground">IP:</span>
               <span className="text-foreground/80 font-mono">{data.input}</span>
             </div>
-            {data.ipinfo?.hostname && (
+            {ipinfoData?.hostname && (
               <div className="flex items-center gap-1.5">
                 <Server className="h-3 w-3 text-brand-primary/60" />
                 <span className="text-muted-foreground truncate max-w-[200px]">
-                  {data.ipinfo.hostname}
+                  {ipinfoData.hostname}
                 </span>
               </div>
             )}
           </div>
           <div className="flex items-center gap-4">
-            {data.ipinfo?.country && (
+            {ipinfoData?.country && (
               <span className="text-muted-foreground font-mono text-[11px] flex items-center gap-1">
                 <MapPin className="h-2.5 w-2.5 text-brand-primary/50" />
-                {data.ipinfo.country}
+                {ipinfoData.country}
               </span>
             )}
             <span className="text-muted-foreground/50 flex items-center gap-1">
@@ -191,9 +199,9 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
               <div className="text-2xl font-bold text-foreground font-mono">
                 {data.input}
               </div>
-              {data.ipinfo?.hostname && (
+              {ipinfoData?.hostname && (
                 <div className="text-[10px] text-muted-foreground mt-1 font-mono">
-                  {data.ipinfo.hostname}
+                  {ipinfoData.hostname}
                 </div>
               )}
             </div>
@@ -236,7 +244,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
           </div>
 
           {/* Geolocation Section */}
-          {data.ipinfo && (
+          {ipinfoData && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 p-2 bg-brand-primary/5 border-l-4 border-brand-primary">
                 <MapPin className="h-3.5 w-3.5 text-brand-primary" />
@@ -250,7 +258,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                     Country
                   </div>
                   <div className="text-sm font-medium text-foreground mt-0.5">
-                    {data.ipinfo.country || "N/A"}
+                    {ipinfoData.country || "N/A"}
                   </div>
                 </div>
                 <div className="px-3 py-2 bg-surface-1">
@@ -258,7 +266,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                     Region
                   </div>
                   <div className="text-sm font-medium text-foreground mt-0.5">
-                    {data.ipinfo.region || "N/A"}
+                    {ipinfoData.region || "N/A"}
                   </div>
                 </div>
                 <div className="px-3 py-2 bg-surface-1">
@@ -266,7 +274,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                     City
                   </div>
                   <div className="text-sm font-medium text-foreground mt-0.5">
-                    {data.ipinfo.city || "N/A"}
+                    {ipinfoData.city || "N/A"}
                   </div>
                 </div>
                 <div className="px-3 py-2 bg-surface-1">
@@ -274,7 +282,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                     Postal
                   </div>
                   <div className="text-sm font-medium text-foreground mt-0.5">
-                    {data.ipinfo.postal || "N/A"}
+                    {ipinfoData.postal || "N/A"}
                   </div>
                 </div>
                 <div className="px-3 py-2 bg-surface-1 col-span-2">
@@ -282,7 +290,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                     Coordinates
                   </div>
                   <div className="text-sm font-mono text-foreground mt-0.5">
-                    {data.ipinfo.loc || "N/A"}
+                    {ipinfoData.loc || "N/A"}
                   </div>
                 </div>
                 <div className="px-3 py-2 bg-surface-1 col-span-2">
@@ -290,7 +298,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                     Timezone
                   </div>
                   <div className="text-sm font-medium text-foreground mt-0.5">
-                    {data.ipinfo.timezone || "N/A"}
+                    {ipinfoData.timezone || "N/A"}
                   </div>
                 </div>
               </div>
@@ -311,7 +319,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                   ISP / Organization
                 </div>
                 <div className="text-sm font-medium text-foreground mt-0.5">
-                  {data.ipinfo?.org || "N/A"}
+                  {ipinfoData?.org || "N/A"}
                 </div>
               </div>
               <div className="px-3 py-2 bg-surface-1">
@@ -319,7 +327,11 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                   ASN
                 </div>
                 <div className="text-sm font-mono text-foreground mt-0.5">
-                  {data.vt?.asn ? `AS${data.vt.asn}` : "N/A"}
+                  {vtData?.asn
+                    ? `AS${vtData.asn}`
+                    : vtData?.as_owner
+                      ? "N/A"
+                      : "N/A"}
                 </div>
               </div>
               <div className="px-3 py-2 bg-surface-1">
@@ -327,7 +339,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                   AS Owner
                 </div>
                 <div className="text-sm font-medium text-foreground mt-0.5">
-                  {data.vt?.as_owner || "N/A"}
+                  {vtData?.as_owner || ipinfoData?.org_name || "N/A"}
                 </div>
               </div>
               <div className="px-3 py-2 bg-surface-1">
@@ -335,7 +347,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                   Network Range
                 </div>
                 <div className="text-sm font-mono text-foreground mt-0.5">
-                  {data.vt?.network || "N/A"}
+                  {vtData?.network || "N/A"}
                 </div>
               </div>
             </div>
@@ -353,25 +365,25 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
               <div className="px-3 py-2 bg-surface-1 flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground">VPN</span>
                 <span
-                  className={`text-[10px] font-bold ${data.vpnapi?.security?.vpn ? "text-risk-critical" : "text-risk-low"}`}
+                  className={`text-[10px] font-bold ${vpnapiData?.security?.vpn ? "text-risk-critical" : "text-risk-low"}`}
                 >
-                  {data.vpnapi?.security?.vpn ? "Detected" : "Clean"}
+                  {vpnapiData?.security?.vpn ? "Detected" : "Clean"}
                 </span>
               </div>
               <div className="px-3 py-2 bg-surface-1 flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground">Proxy</span>
                 <span
-                  className={`text-[10px] font-bold ${data.vpnapi?.security?.proxy ? "text-risk-critical" : "text-risk-low"}`}
+                  className={`text-[10px] font-bold ${vpnapiData?.security?.proxy ? "text-risk-critical" : "text-risk-low"}`}
                 >
-                  {data.vpnapi?.security?.proxy ? "Detected" : "Clean"}
+                  {vpnapiData?.security?.proxy ? "Detected" : "Clean"}
                 </span>
               </div>
               <div className="px-3 py-2 bg-surface-1 flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground">TOR</span>
                 <span
-                  className={`text-[10px] font-bold ${data.vpnapi?.security?.tor ? "text-risk-critical" : "text-risk-low"}`}
+                  className={`text-[10px] font-bold ${vpnapiData?.security?.tor ? "text-risk-critical" : "text-risk-low"}`}
                 >
-                  {data.vpnapi?.security?.tor ? "Detected" : "Clean"}
+                  {vpnapiData?.security?.tor ? "Detected" : "Clean"}
                 </span>
               </div>
               <div className="px-3 py-2 bg-surface-1 flex items-center justify-between">
@@ -379,9 +391,9 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                   Hosting
                 </span>
                 <span
-                  className={`text-[10px] font-bold ${data.ipinfo?.is_hosting ? "text-risk-high" : "text-risk-low"}`}
+                  className={`text-[10px] font-bold ${ipinfoData?.privacy?.hosting ? "text-risk-high" : "text-risk-low"}`}
                 >
-                  {data.ipinfo?.is_hosting ? "Yes" : "No"}
+                  {ipinfoData?.privacy?.hosting ? "Yes" : "No"}
                 </span>
               </div>
             </div>
@@ -401,7 +413,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                   VirusTotal
                 </div>
                 <div className="text-lg font-bold text-risk-critical mt-0.5">
-                  {data.vt?.last_analysis_stats?.malicious || 0}
+                  {vtData?.last_analysis_stats?.malicious || 0}
                 </div>
                 <div className="text-[8px] text-muted-foreground">
                   Malicious
@@ -414,7 +426,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                 <div
                   className={`text-lg font-bold mt-0.5 ${getRiskColorClass()}`}
                 >
-                  {data.abuseipdb?.abuseConfidenceScore || 0}%
+                  {abuseipdbData?.abuseConfidenceScore || 0}%
                 </div>
                 <div className="text-[8px] text-muted-foreground">
                   Confidence
@@ -425,7 +437,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                   Abuse Reports
                 </div>
                 <div className="text-lg font-bold text-foreground mt-0.5">
-                  {data.abuseipdb?.totalReports || 0}
+                  {abuseipdbData?.totalReports || 0}
                 </div>
                 <div className="text-[8px] text-muted-foreground">Total</div>
               </div>
@@ -434,7 +446,7 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
                   OTX Pulses
                 </div>
                 <div className="text-lg font-bold text-foreground mt-0.5">
-                  {data.otx?.pulse_count || 0}
+                  {otxData?.pulse_count || 0}
                 </div>
                 <div className="text-[8px] text-muted-foreground">
                   AlienVault
@@ -444,50 +456,54 @@ export function BrowserLeaksCard({ data }: BrowserLeaksCardProps) {
           </div>
 
           {/* Blacklist Status */}
-          {data.multirbl && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 p-2 bg-brand-primary/5 border-l-4 border-brand-primary">
-                <Activity className="h-3.5 w-3.5 text-brand-primary" />
-                <span className="text-[10px] font-bold text-foreground uppercase tracking-wider">
-                  Blacklist Status
-                </span>
-              </div>
-              <div className="p-3 bg-surface-1 border border-border/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-muted-foreground">
-                    RBL Blacklists
-                  </span>
-                  <span
-                    className={`text-[11px] font-bold ${data.multirbl.listedCount > 0 ? "text-risk-critical" : "text-risk-low"}`}
-                  >
-                    {data.multirbl.listedCount} / {data.multirbl.totalChecked}{" "}
-                    Listed
+          {multirblData &&
+            multirblData.lists &&
+            multirblData.lists.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-2 bg-brand-primary/5 border-l-4 border-brand-primary">
+                  <Activity className="h-3.5 w-3.5 text-brand-primary" />
+                  <span className="text-[10px] font-bold text-foreground uppercase tracking-wider">
+                    Blacklist Status
                   </span>
                 </div>
-                <div className="space-y-1 max-h-[120px] overflow-y-auto custom-scrollbar">
-                  {data.multirbl.lists?.map((list, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between text-[10px] py-0.5"
+                <div className="p-3 bg-surface-1 border border-border/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      RBL Blacklists
+                    </span>
+                    <span
+                      className={`text-[11px] font-bold ${multirblData.listedCount > 0 ? "text-risk-critical" : "text-risk-low"}`}
                     >
-                      <span className="text-muted-foreground font-mono">
-                        {list.name}
-                      </span>
-                      {list.listed ? (
-                        <span className="text-risk-critical flex items-center gap-1">
-                          <XCircle className="h-3 w-3" /> Listed
-                        </span>
-                      ) : (
-                        <span className="text-risk-low flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3" /> Clean
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                      {multirblData.listedCount} / {multirblData.totalChecked}{" "}
+                      Listed
+                    </span>
+                  </div>
+                  <div className="space-y-1 max-h-[120px] overflow-y-auto custom-scrollbar">
+                    {multirblData.lists.map(
+                      (list: MultiRBLList, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-[10px] py-0.5"
+                        >
+                          <span className="text-muted-foreground font-mono">
+                            {list.name}
+                          </span>
+                          {list.listed ? (
+                            <span className="text-risk-critical flex items-center gap-1">
+                              <XCircle className="h-3 w-3" /> Listed
+                            </span>
+                          ) : (
+                            <span className="text-risk-low flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" /> Clean
+                            </span>
+                          )}
+                        </div>
+                      ),
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Timestamp */}
           <div className="flex items-center justify-between pt-2 border-t border-brand-primary/20">
