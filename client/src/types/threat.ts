@@ -612,6 +612,9 @@ export interface AISummaryMeta {
   model?: string;
   promptTokens?: number;
   responseTokens?: number;
+  riskCalculatedBy?: string;
+  fallbackUsed?: boolean;
+  error?: string;
 }
 
 export interface ThreatData {

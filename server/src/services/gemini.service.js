@@ -1,4 +1,3 @@
-// src/services/gemini.service.js
 const { GoogleGenAI } = require("@google/genai");
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -22,24 +21,17 @@ function extractRelevantData(threatData) {
     data.vt = {
       malicious: threatData.vt.last_analysis_stats?.malicious || 0,
       suspicious: threatData.vt.last_analysis_stats?.suspicious || 0,
-      harmless: threatData.vt.last_analysis_stats?.harmless || 0,
-      undetected: threatData.vt.last_analysis_stats?.undetected || 0,
       as_owner: threatData.vt.as_owner,
       country: threatData.vt.country,
-      jarm: threatData.vt.jarm,
     };
   }
 
   // AbuseIPDB
   if (threatData.abuseipdb && !threatData.abuseipdb.error) {
     data.abuseipdb = {
-      confidence_score: threatData.abuseipdb.abuseConfidenceScore,
-      total_reports: threatData.abuseipdb.totalReports,
-      distinct_users: threatData.abuseipdb.numDistinctUsers,
-      country: threatData.abuseipdb.countryCode,
-      isp: threatData.abuseipdb.isp,
-      usage_type: threatData.abuseipdb.usageType,
-      last_reported: threatData.abuseipdb.lastReportedAt,
+      confidence: threatData.abuseipdb.abuseConfidenceScore,
+      reports: threatData.abuseipdb.totalReports,
+      users: threatData.abuseipdb.numDistinctUsers,
     };
   }
 
@@ -49,27 +41,19 @@ function extractRelevantData(threatData) {
       classification: threatData.greynoise.classification,
       noise: threatData.greynoise.noise,
       riot: threatData.greynoise.riot,
-      name: threatData.greynoise.name,
-      last_seen: threatData.greynoise.last_seen,
     };
   }
 
-  // AlienVault OTX
+  // OTX
   if (threatData.otx && !threatData.otx.error) {
-    data.otx = {
-      pulse_count: threatData.otx.pulse_count,
-      is_malicious: threatData.otx.is_malicious,
-      tags: threatData.otx.tags?.slice(0, 5),
-    };
+    data.otx = { pulses: threatData.otx.pulse_count };
   }
 
   // Pulsedive
   if (threatData.pulsedive && !threatData.pulsedive.error) {
     data.pulsedive = {
       risk: threatData.pulsedive.risk,
-      is_malicious: threatData.pulsedive.is_malicious,
-      threat_count: threatData.pulsedive.threats?.length || 0,
-      feed_count: threatData.pulsedive.feeds?.length || 0,
+      malicious: threatData.pulsedive.is_malicious,
     };
   }
 
@@ -78,60 +62,19 @@ function extractRelevantData(threatData) {
     data.ipinfo = {
       country: threatData.ipinfo.country,
       city: threatData.ipinfo.city,
-      region: threatData.ipinfo.region,
       org: threatData.ipinfo.org_name,
-      asn: threatData.ipinfo.asn,
-      hostname: threatData.ipinfo.hostname,
     };
   }
 
   // MultiRBL
   if (threatData.multirbl && !threatData.multirbl.error) {
     data.blacklists = {
-      listed_count: threatData.multirbl.listedCount,
-      total_checked: threatData.multirbl.totalChecked,
-      lists: threatData.multirbl.lists
+      listed: threatData.multirbl.listedCount,
+      total: threatData.multirbl.totalChecked,
+      names: threatData.multirbl.lists
         ?.filter((l) => l.listed)
         .map((l) => l.name),
     };
-  }
-
-  // IPQS (handle insufficient credits gracefully)
-  if (threatData.ipqualityscore) {
-    if (threatData.ipqualityscore.raw?.success === false) {
-      data.ipqs = { status: "insufficient_credits" };
-    } else if (threatData.ipqualityscore.fraud_score !== undefined) {
-      data.ipqs = {
-        fraud_score: threatData.ipqualityscore.fraud_score,
-        vpn: threatData.ipqualityscore.vpn,
-        proxy: threatData.ipqualityscore.proxy,
-        tor: threatData.ipqualityscore.tor,
-      };
-    }
-  }
-
-  // URL-specific data
-  if (type === "url" || type === "domain") {
-    if (threatData.urlscan && !threatData.urlscan.error) {
-      data.urlscan = {
-        malicious: threatData.urlscan.is_malicious,
-        score: threatData.urlscan.score,
-        domain: threatData.urlscan.page?.domain,
-      };
-    }
-    if (threatData.urlhaus && !threatData.urlhaus.error) {
-      data.urlhaus = {
-        malicious: threatData.urlhaus.is_malicious,
-        url_count: threatData.urlhaus.count,
-        tags: threatData.urlhaus.tags?.slice(0, 5),
-      };
-    }
-    if (threatData.sucuri && !threatData.sucuri.error) {
-      data.sucuri = {
-        malicious: threatData.sucuri.is_malicious,
-        blacklist_count: threatData.sucuri.blacklisted_by?.length || 0,
-      };
-    }
   }
 
   return data;
@@ -139,83 +82,73 @@ function extractRelevantData(threatData) {
 
 function buildPrompt(threatData, extractedData) {
   const type = threatData.type || "ip";
-  const hasData = Object.keys(extractedData).length > 2; // more than just type and input
+  const hasData = Object.keys(extractedData).length > 2;
 
-  // If no meaningful data, ask AI to analyze what it can
   if (!hasData) {
-    return `
-You are a senior threat intelligence analyst. The indicator "${threatData.input}" (type: ${type}) was queried but returned no threat intelligence data from any source.
+    return `Return JSON for "${threatData.input}" (${type}) with no data: {"riskScore":10,"riskLevel":"LOW","executiveSummary":"No threat data found.","riskAssessment":"• No intelligence available","keyIndicators":["No data"],"potentialThreats":["Unknown"],"recommendations":["Monitor","Re-query"],"confidenceLevel":"LOW","sourcesContributingMost":[],"tacticalAdvice":"Monitor for 48 hours"}`;
+  }
 
-**Possible reasons**:
-- The indicator may be new or not previously seen
-- API rate limits or authentication issues
-- The indicator type may not be supported by available sources
+  return `Analyze threat data for ${threatData.input} (${type}):
 
-**Task**: Based on your cybersecurity expertise alone (since no external data is available), provide a conservative risk assessment.
+${JSON.stringify(extractedData, null, 2)}
 
 Return ONLY valid JSON:
 {
-  "riskScore": number (0-30, since no data available),
-  "riskLevel": "LOW",
-  "executiveSummary": "Brief explanation that no threat data was found",
-  "riskAssessment": "Explanation of why risk is unknown/low",
-  "keyIndicators": ["No threat intelligence data available from any source"],
-  "potentialThreats": ["Unknown - insufficient data"],
-  "recommendations": ["Monitor this indicator manually", "Re-query after 24 hours", "Check local logs for activity"],
-  "confidenceLevel": "LOW",
-  "sourcesContributingMost": ["None - no data returned"],
-  "tacticalAdvice": "Treat as unknown and monitor for 48 hours before blocking"
-}`;
+  "riskScore": number 0-100,
+  "riskLevel": "CRITICAL"|"HIGH"|"MEDIUM"|"LOW",
+  "executiveSummary": "1 sentence max 120 chars",
+  "riskAssessment": "• bullet1\\n• bullet2\\n• bullet3",
+  "keyIndicators": ["i1","i2","i3"],
+  "potentialThreats": ["t1","t2","t3"],
+  "recommendations": ["r1","r2","r3"],
+  "confidenceLevel": "HIGH"|"MEDIUM"|"LOW",
+  "sourcesContributingMost": ["s1","s2","s3"],
+  "tacticalAdvice": "1 sentence max 80 chars"
+}
+
+Scoring: 80-100=CRITICAL, 60-79=HIGH, 40-59=MEDIUM, 0-39=LOW
+Keep all text SHORT. Use 3 bullets max. No fluff.`;
+}
+
+function formatForScreenReader(result) {
+  // Ensure riskAssessment uses bullet points
+  if (result.riskAssessment && typeof result.riskAssessment === "string") {
+    if (
+      !result.riskAssessment.includes("•") &&
+      result.riskAssessment.length > 100
+    ) {
+      const sentences = result.riskAssessment
+        .split(/\.\s+/)
+        .filter((s) => s.length > 10);
+      if (sentences.length > 1) {
+        result.riskAssessment = sentences
+          .slice(0, 3)
+          .map((s) => `• ${s}.`)
+          .join("\n");
+      }
+    }
   }
 
-  // Build detailed prompt with available data
-  return `
-You are a world-class senior cybersecurity threat intelligence analyst with 15+ years of experience in SOC, DFIR, and threat hunting.
+  // Trim long strings
+  if (result.executiveSummary && result.executiveSummary.length > 150) {
+    result.executiveSummary = result.executiveSummary.substring(0, 147) + "...";
+  }
 
-**Indicator**: ${threatData.input} (${type})
+  if (result.tacticalAdvice && result.tacticalAdvice.length > 100) {
+    result.tacticalAdvice = result.tacticalAdvice.substring(0, 97) + "...";
+  }
 
-**Available Threat Intelligence**:
-${JSON.stringify(extractedData, null, 2)}
+  // Ensure arrays have max 5 items
+  if (result.keyIndicators)
+    result.keyIndicators = result.keyIndicators.slice(0, 5);
+  if (result.potentialThreats)
+    result.potentialThreats = result.potentialThreats.slice(0, 4);
+  if (result.recommendations)
+    result.recommendations = result.recommendations.slice(0, 5);
+  if (result.sourcesContributingMost)
+    result.sourcesContributingMost = result.sourcesContributingMost.slice(0, 4);
 
-**Analysis Instructions**:
-1. Analyze the available data critically - if a source returned no data or errors, treat it as "no information" not "clean"
-2. Focus on CONFIRMED malicious indicators over the absence of data
-3. Consider the reputation and reliability of each source
-4. Evaluate the totality of evidence, not individual signals in isolation
-
-**Risk Assessment Guidelines**:
-- 0-19 (LOW): No malicious indicators, appears to be legitimate infrastructure
-- 20-39 (LOW-MEDIUM): Suspicious signals but no confirmed malicious activity
-- 40-59 (MEDIUM): One confirmed malicious source or multiple suspicious signals
-- 60-79 (HIGH): Multiple confirmed malicious sources or active scanning/attack patterns  
-- 80-100 (CRITICAL): Active C2 infrastructure, malware distribution, or coordinated attack campaigns
-
-**Scoring Weights** (use as guidance):
-- GreyNoise "malicious" classification: +30-35 points
-- AbuseIPDB 75-100% confidence: +20-30 points
-- VirusTotal malicious detections (1-5: +10, 6-10: +20, 10+: +30)
-- Multi-RBL listing: +10-15 points
-- OTX pulses (1-5: +5, 5-10: +10, 10+: +15)
-- URLhaus/Sucuri detection: +15-25 points
-
-**Important**: 
-- Some sources may have failed (API errors, rate limits) - treat these as "no data" not "clean"
-- Base your assessment ONLY on data that successfully returned
-- If no data is available from any source, assign LOW risk with appropriate explanation
-
-Return ONLY valid JSON (no markdown, no extra text):
-{
-  "riskScore": number,
-  "riskLevel": "CRITICAL" | "HIGH" | "MEDIUM" | "LOW",
-  "executiveSummary": "One powerful paragraph (2-3 sentences) summarizing the threat",
-  "riskAssessment": "Detailed explanation of the key risk drivers based on available evidence",
-  "keyIndicators": ["Most impactful indicator 1", "Indicator 2", "... (max 5)"],
-  "potentialThreats": ["Specific realistic threat 1", "Threat 2", "... (max 4)"],
-  "recommendations": ["Immediate action 1", "Action 2", "... (max 5, prioritized)"],
-  "confidenceLevel": "HIGH" | "MEDIUM" | "LOW",
-  "sourcesContributingMost": ["Source 1", "Source 2", "Source 3"],
-  "tacticalAdvice": "One decisive sentence with the most important immediate action"
-}`;
+  return result;
 }
 
 async function generateThreatSummaryAndRisk(threatData) {
@@ -223,19 +156,10 @@ async function generateThreatSummaryAndRisk(threatData) {
     throw new Error("Invalid threat data");
   }
 
-  // Extract and clean relevant data for the prompt
   const extractedData = extractRelevantData(threatData);
   const prompt = buildPrompt(threatData, extractedData);
 
-  // Log what data we're sending (for debugging)
-  console.log(`[Gemini] Analyzing ${threatData.input} (${threatData.type})`);
-  console.log(
-    `[Gemini] Data sources available: ${
-      Object.keys(extractedData)
-        .filter((k) => k !== "type" && k !== "input")
-        .join(", ") || "none"
-    }`,
-  );
+  console.log(`[Gemini] Analyzing ${threatData.input}`);
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     for (const model of MODELS) {
@@ -246,48 +170,39 @@ async function generateThreatSummaryAndRisk(threatData) {
         });
 
         let text = response.text.trim();
-        // Clean markdown code blocks
         text = text
           .replace(/```json\n?/g, "")
           .replace(/```\n?/g, "")
           .trim();
 
-        const result = JSON.parse(text);
+        let result = JSON.parse(text);
 
-        // Validate required fields
         if (typeof result.riskScore !== "number") {
-          throw new Error("Missing riskScore in response");
-        }
-        if (
-          !result.riskLevel ||
-          !["CRITICAL", "HIGH", "MEDIUM", "LOW"].includes(result.riskLevel)
-        ) {
-          throw new Error("Invalid riskLevel in response");
+          throw new Error("Missing riskScore");
         }
 
-        // Ensure risk score is within bounds
         result.riskScore = Math.min(100, Math.max(0, result.riskScore));
+        result = formatForScreenReader(result);
 
         console.log(
-          `[Gemini] ✓ Success with ${model} | Risk: ${result.riskScore} (${result.riskLevel})`,
+          `[Gemini] ✓ ${model} | Risk: ${result.riskScore} (${result.riskLevel})`,
         );
 
         return {
           success: true,
           summary: {
-            executiveSummary: result.executiveSummary,
-            riskAssessment: result.riskAssessment,
+            executiveSummary: result.executiveSummary || "Analysis complete.",
+            riskAssessment:
+              result.riskAssessment || "• No specific risks identified",
             keyIndicators: result.keyIndicators || ["Analysis completed"],
-            potentialThreats: result.potentialThreats || ["Insufficient data"],
-            recommendations: result.recommendations || [
-              "Monitor and re-analyze",
-            ],
+            potentialThreats: result.potentialThreats || ["None identified"],
+            recommendations: result.recommendations || ["Monitor as usual"],
             confidenceLevel: result.confidenceLevel || "MEDIUM",
             sourcesContributingMost: result.sourcesContributingMost || [
-              "Analysis based on available data",
+              "Available data",
             ],
             tacticalAdvice:
-              result.tacticalAdvice || "Continue monitoring for new indicators",
+              result.tacticalAdvice || "Continue standard monitoring",
           },
           riskScore: result.riskScore,
           riskLevel: result.riskLevel,
@@ -295,40 +210,30 @@ async function generateThreatSummaryAndRisk(threatData) {
           generatedAt: new Date().toISOString(),
         };
       } catch (err) {
-        const msg = err.message || JSON.stringify(err);
-        console.warn(
-          `[Gemini] ${model} attempt ${attempt} failed: ${msg.substring(0, 200)}`,
-        );
-
-        // Don't retry on parse errors, just try next model
-        if (msg.includes("503") || msg.includes("429")) {
+        console.warn(`[Gemini] ${model} attempt ${attempt}:`, err.message);
+        if (err.message?.includes("503") || err.message?.includes("429")) {
           await sleep(attempt * 2000);
         }
       }
     }
   }
 
-  // Fallback response when all models fail
   console.error(`[Gemini] All models failed for ${threatData.input}`);
   return {
     success: false,
-    error: "Gemini API unavailable after retries",
+    error: "Gemini API unavailable",
     fallbackRisk: {
       riskScore: 0,
       riskLevel: "LOW",
       summary: {
-        executiveSummary: `Unable to analyze ${threatData.input} due to AI service unavailability.`,
-        riskAssessment: "Risk assessment could not be performed at this time.",
-        keyIndicators: ["AI service temporarily unavailable"],
-        potentialThreats: ["Unknown - analysis failed"],
-        recommendations: [
-          "Try again in a few minutes",
-          "Check API key validity",
-          "Verify network connectivity",
-        ],
+        executiveSummary: `Analysis unavailable.`,
+        riskAssessment: "• AI service unavailable\n• Try again later",
+        keyIndicators: ["Service unavailable"],
+        potentialThreats: ["Unknown"],
+        recommendations: ["Retry analysis", "Check API status"],
         confidenceLevel: "LOW",
         sourcesContributingMost: [],
-        tacticalAdvice: "Re-query when AI service is available",
+        tacticalAdvice: "Re-query when available",
       },
     },
   };

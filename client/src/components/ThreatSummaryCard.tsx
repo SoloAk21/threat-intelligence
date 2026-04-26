@@ -1,17 +1,14 @@
-// src/components/ThreatSummaryCard.tsx
 import { useState } from "react";
 import {
   Shield,
-  AlertTriangle,
   Target,
-  Clock,
-  Wifi,
-  Eye,
   Download,
   ClipboardCopy,
   Check,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
+  Eye,
 } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 import type { ThreatData, GreyNoiseData } from "@/types/threat";
@@ -33,15 +30,10 @@ export function ThreatSummaryCard({
   const [showDetails, setShowDetails] = useState(false);
 
   const riskScore = data.riskScore || 0;
-  const riskLevel =
-    data.riskLevel ||
-    (riskScore >= 80
-      ? "CRITICAL"
-      : riskScore >= 60
-        ? "HIGH"
-        : riskScore >= 40
-          ? "MEDIUM"
-          : "LOW");
+  const riskLevel = data.riskLevel;
+  const riskCalculatedByAI =
+    data.aiSummaryMeta?.riskCalculatedBy === "gemini-ai";
+  const fallbackUsed = data.aiSummaryMeta?.fallbackUsed === true;
 
   const getRiskColor = (score: number) => {
     if (score >= 80) return "text-red-500";
@@ -50,65 +42,47 @@ export function ThreatSummaryCard({
     return "text-green-500";
   };
 
-  // Get AbuseIPDB data
+  const getRiskBg = (level: string) => {
+    switch (level) {
+      case "CRITICAL":
+        return "bg-red-500/10 text-red-500 border-red-500/30";
+      case "HIGH":
+        return "bg-orange-500/10 text-orange-500 border-orange-500/30";
+      case "MEDIUM":
+        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/30";
+      default:
+        return "bg-green-500/10 text-green-500 border-green-500/30";
+    }
+  };
+
   const abuseConfidence = data.abuseipdb?.abuseConfidenceScore || 0;
   const totalReports = data.abuseipdb?.totalReports || 0;
-
-  // Get VirusTotal data
   const vtMalicious = data.vt?.last_analysis_stats?.malicious || 0;
   const vtSuspicious = data.vt?.last_analysis_stats?.suspicious || 0;
-
-  // Get OTX data
   const otxPulses = data.otx?.pulse_count || 0;
 
-  // Privacy indicators
-  const isVPN =
-    data.vpnapi?.security?.vpn ||
-    data.ipteoh?.security?.vpn ||
-    data.ipify?.proxy?.vpn ||
-    false;
+  const greynoise = data.greynoise as GreyNoiseData;
+  const isNoise = greynoise?.noise || false;
+  const greyNoiseClassification = greynoise?.classification || "unknown";
+  const isRiot = greynoise?.riot || false;
 
-  const isProxy =
-    data.vpnapi?.security?.proxy ||
-    data.ipteoh?.security?.proxy ||
-    data.ipify?.proxy?.proxy ||
-    false;
+  const isVPN = data.vpnapi?.security?.vpn || false;
+  const isProxy = data.vpnapi?.security?.proxy || false;
+  const isTor = data.vpnapi?.security?.tor || false;
 
-  const isTor =
-    data.vpnapi?.security?.tor ||
-    data.ipteoh?.security?.tor ||
-    data.ipify?.proxy?.tor ||
-    false;
-
-  const isNoise = (data.greynoise as GreyNoiseData)?.noise || false;
-  const greyNoiseClassification =
-    (data.greynoise as GreyNoiseData)?.classification || "unknown";
-
-  // Location data - prioritize ipinfo as it has city data
   const countryCode =
-    data.ipinfo?.country ||
-    data.vpnapi?.location?.country_code ||
-    data.abuseipdb?.countryCode ||
-    data.vt?.country ||
-    "XX";
-
+    data.ipinfo?.country || data.abuseipdb?.countryCode || "XX";
   const countryName =
-    data.ipinfo?.country ||
-    data.vpnapi?.location?.country ||
-    data.abuseipdb?.countryName ||
-    "Unknown";
+    data.ipinfo?.country || data.abuseipdb?.countryName || "Unknown";
+  const city = data.ipinfo?.city || "N/A";
+  const isp = data.ipinfo?.org_name || data.abuseipdb?.isp || "Unknown ISP";
 
-  const city = data.ipinfo?.city || data.vpnapi?.location?.city || "N/A";
-
-  const isp =
-    data.ipinfo?.org_name ||
-    data.vpnapi?.network?.autonomous_system_organization ||
-    data.abuseipdb?.isp ||
-    data.ipify?.isp ||
-    "Unknown ISP";
+  const ipqsError = data.ipqualityscore?.raw?.success === false;
+  const ipqsMessage = data.ipqualityscore?.raw?.message || "";
 
   const handleCopy = () => {
-    const text = `${data.input} | Risk: ${riskScore}/100 (${riskLevel}) | AbuseIPDB: ${abuseConfidence}% | VT Malicious: ${vtMalicious} | ${data.aiSummary?.executiveSummary?.substring(0, 100) || ""}`;
+    const summary = data.aiSummary?.executiveSummary || "No summary available";
+    const text = `${data.input} | Risk: ${riskScore}/100 (${riskLevel}) | ${summary}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -122,10 +96,31 @@ export function ThreatSummaryCard({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `threat-analysis-${data.input}.json`;
+    a.download = `threat-${data.input}-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     onExport?.();
+  };
+
+  // Format bullet points for riskAssessment
+  const renderBulletPoints = (text: string) => {
+    if (!text) return null;
+    const points = text
+      .split("\n")
+      .filter((p) => p.trim().startsWith("•") || p.trim().startsWith("-"));
+    if (points.length > 0) {
+      return (
+        <ul className="space-y-1">
+          {points.slice(0, 3).map((point, i) => (
+            <li key={i} className="flex gap-2 text-xs text-foreground/80">
+              <span className="text-primary mt-0.5">•</span>
+              <span>{point.replace(/^[•\-]\s*/, "")}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    return <p className="text-xs text-foreground/80">{text}</p>;
   };
 
   return (
@@ -136,10 +131,17 @@ export function ThreatSummaryCard({
           <Target className="h-5 w-5 text-primary" />
           <div>
             <div className="font-mono text-sm font-medium">{data.input}</div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-widest">
-              {data.type?.toUpperCase() ||
-                data.inputType?.toUpperCase() ||
-                "IP"}
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[10px] text-muted-foreground uppercase">
+                {data.type?.toUpperCase() ||
+                  data.inputType?.toUpperCase() ||
+                  "IP"}
+              </span>
+              {riskCalculatedByAI && (
+                <span className="text-[8px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full">
+                  AI Scored
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -153,17 +155,8 @@ export function ThreatSummaryCard({
             </div>
             <div className="text-[10px] text-muted-foreground -mt-1">/100</div>
           </div>
-
           <div
-            className={`px-3 py-1 text-xs font-bold uppercase rounded-full border ${
-              riskLevel === "CRITICAL"
-                ? "bg-red-500/10 text-red-500 border-red-500/30"
-                : riskLevel === "HIGH"
-                  ? "bg-orange-500/10 text-orange-500 border-orange-500/30"
-                  : riskLevel === "MEDIUM"
-                    ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
-                    : "bg-green-500/10 text-green-500 border-green-500/30"
-            }`}
+            className={`px-3 py-1 text-xs font-bold uppercase rounded-full border ${getRiskBg(riskLevel)}`}
           >
             {riskLevel}
           </div>
@@ -171,7 +164,7 @@ export function ThreatSummaryCard({
       </div>
 
       {/* Quick Info */}
-      <div className="px-4 py-2.5 flex flex-wrap items-center gap-3 text-xs border-b border-border bg-muted/30">
+      <div className="px-4 py-2 flex flex-wrap items-center gap-2 text-xs border-b border-border bg-muted/30">
         {countryCode !== "XX" && (
           <>
             <ReactCountryFlag
@@ -179,42 +172,45 @@ export function ThreatSummaryCard({
               svg
               style={{ width: "1.1em", height: "0.8em" }}
             />
-            <span className="text-muted-foreground truncate">
-              {city !== "N/A" && `${city}, `}
+            <span className="text-muted-foreground">
+              {city !== "N/A" ? `${city}, ` : ""}
               {countryName}
             </span>
           </>
         )}
-
         {isp !== "Unknown ISP" && (
           <>
             <span className="text-muted-foreground/40">•</span>
             <span className="truncate">{isp}</span>
           </>
         )}
-
-        {(isVPN || isProxy || isTor || isNoise) && (
+        {(isVPN || isProxy || isTor || isNoise || isRiot) && (
           <>
             <span className="text-muted-foreground/40">•</span>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               {isVPN && (
-                <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-500 rounded text-[10px] font-medium">
+                <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-500 rounded text-[9px]">
                   VPN
                 </span>
               )}
               {isProxy && (
-                <span className="px-1.5 py-0.5 bg-yellow-500/10 text-yellow-500 rounded text-[10px] font-medium">
+                <span className="px-1.5 py-0.5 bg-yellow-500/10 text-yellow-500 rounded text-[9px]">
                   Proxy
                 </span>
               )}
               {isTor && (
-                <span className="px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded text-[10px] font-medium">
+                <span className="px-1.5 py-0.5 bg-red-500/10 text-red-500 rounded text-[9px]">
                   Tor
                 </span>
               )}
               {isNoise && (
-                <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-500 rounded text-[10px] font-medium">
+                <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-500 rounded text-[9px]">
                   Scanner
+                </span>
+              )}
+              {isRiot && (
+                <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-500 rounded text-[9px]">
+                  RIOT
                 </span>
               )}
             </div>
@@ -222,130 +218,171 @@ export function ThreatSummaryCard({
         )}
       </div>
 
-      {/* AI Summary - The Star of the Show */}
+      {/* AI Summary */}
       {data.aiSummary && (
-        <div className="p-4 border-b border-border bg-gradient-to-r from-emerald-50/10 to-transparent">
+        <div className="p-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center gap-2 mb-3">
-            <Shield className="h-4 w-4 text-emerald-500" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              AI Threat Intelligence Summary
+            <Shield className="h-4 w-4 text-primary" />
+            <span className="text-xs font-semibold uppercase text-primary">
+              Threat Summary
             </span>
-            {data.aiSummary.confidenceLevel && (
-              <span className="ml-auto text-[10px] px-2 py-0.5 bg-muted rounded-full">
-                Confidence: {data.aiSummary.confidenceLevel}
-              </span>
-            )}
+            <span className="ml-auto text-[10px] px-2 py-0.5 bg-muted rounded-full">
+              Gemini {data.aiSummaryMeta?.model?.split("-")[1] || "AI"}
+            </span>
           </div>
 
-          <p className="text-sm leading-relaxed text-foreground/90 mb-4">
+          {/* Executive Summary */}
+          <p className="text-sm leading-relaxed text-foreground/90 mb-3">
             {data.aiSummary.executiveSummary}
           </p>
 
-          {data.aiSummary.recommendations &&
-            data.aiSummary.recommendations.length > 0 && (
-              <>
-                <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                  Recommendations
-                </div>
-                <ul className="text-xs space-y-1.5">
-                  {data.aiSummary.recommendations.slice(0, 3).map((rec, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="text-emerald-500 mt-0.5">→</span>
-                      <span className="text-foreground/80">{rec}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+          {/* Risk Assessment (Bullet Points) */}
+          {data.aiSummary.riskAssessment && (
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-muted-foreground mb-1">
+                Key Findings
+              </div>
+              {renderBulletPoints(data.aiSummary.riskAssessment)}
+            </div>
+          )}
+
+          {/* Key Indicators */}
+          {data.aiSummary.keyIndicators?.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                <Eye className="h-3 w-3" /> Indicators
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {data.aiSummary.keyIndicators.slice(0, 3).map((ind, i) => (
+                  <span
+                    key={i}
+                    className="text-[10px] px-1.5 py-0.5 bg-muted rounded-full"
+                  >
+                    {ind}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {data.aiSummary.recommendations?.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Actions
+              </div>
+              <ul className="space-y-1">
+                {data.aiSummary.recommendations.slice(0, 3).map((rec, i) => (
+                  <li key={i} className="flex gap-2 text-xs">
+                    <span className="text-primary">→</span>
+                    <span className="text-foreground/80">{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Tactical Advice */}
           {data.aiSummary.tacticalAdvice && (
-            <div className="mt-3 pt-3 border-t border-border/50">
-              <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">
-                Action Item
-              </div>
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+            <div className="pt-2 border-t border-border/50">
+              <p className="text-xs font-medium text-primary">
                 {data.aiSummary.tacticalAdvice}
+              </p>
+            </div>
+          )}
+
+          {/* Fallback Warning */}
+          {fallbackUsed && (
+            <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-center">
+              <p className="text-[10px] text-yellow-600">
+                ⚠️ AI service unavailable - using fallback scoring
               </p>
             </div>
           )}
         </div>
       )}
 
+      {/* IPQS Warning */}
+      {ipqsError && (
+        <div className="px-4 py-2 bg-yellow-500/5 border-b border-yellow-500/20">
+          <p className="text-[10px] text-yellow-600">⚠️ {ipqsMessage}</p>
+        </div>
+      )}
+
       {/* Toggle Details */}
       <button
         onClick={() => setShowDetails(!showDetails)}
-        className="w-full py-2 text-xs flex items-center justify-center gap-1.5 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+        className="w-full py-2 text-xs flex items-center justify-center gap-1 hover:bg-muted/50 transition-colors text-muted-foreground"
       >
         {showDetails ? (
           <ChevronUp className="h-3 w-3" />
         ) : (
           <ChevronDown className="h-3 w-3" />
         )}
-        {showDetails ? "Hide Technical Details" : "Show Technical Details"}
+        {showDetails ? "Hide Details" : "Show Technical Details"}
       </button>
 
-      {/* Technical Details (collapsed by default) */}
+      {/* Technical Details */}
       {showDetails && (
-        <div className="px-4 pb-4 text-xs space-y-3 border-t border-border/50 pt-3">
-          <div>
-            <div className="font-medium mb-2 text-muted-foreground">
-              Key Signals
+        <div className="px-4 pb-4 pt-3 text-xs space-y-3 border-t border-border/50">
+          <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">AbuseIPDB:</span>
+              <span
+                className={`font-mono ${abuseConfidence >= 80 ? "text-red-500" : ""}`}
+              >
+                {abuseConfidence}%
+              </span>
             </div>
-            <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">AbuseIPDB:</span>
-                <span
-                  className={`font-mono font-medium ${abuseConfidence >= 80 ? "text-red-500" : abuseConfidence >= 50 ? "text-orange-500" : ""}`}
-                >
-                  {abuseConfidence}%
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Reports:</span>
-                <span className="font-mono">{totalReports}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">VT Malicious:</span>
-                <span className="font-mono text-red-500">{vtMalicious}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">VT Suspicious:</span>
-                <span className="font-mono text-yellow-500">
-                  {vtSuspicious}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">OTX Pulses:</span>
-                <span className="font-mono">{otxPulses}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">GreyNoise:</span>
-                <span
-                  className={`font-mono ${isNoise ? "text-orange-500" : ""}`}
-                >
-                  {greyNoiseClassification}
-                </span>
-              </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Reports:</span>
+              <span className="font-mono">{totalReports}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">VT Malicious:</span>
+              <span className="font-mono text-red-500">{vtMalicious}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">VT Suspicious:</span>
+              <span className="font-mono text-yellow-500">{vtSuspicious}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">OTX Pulses:</span>
+              <span className="font-mono">{otxPulses}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">GreyNoise:</span>
+              <span
+                className={`font-mono ${greyNoiseClassification === "malicious" ? "text-red-500" : ""}`}
+              >
+                {greyNoiseClassification}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">RBL Listed:</span>
+              <span
+                className={`font-mono ${(data.multirbl?.listedCount || 0) > 0 ? "text-red-500" : "text-green-500"}`}
+              >
+                {data.multirbl?.listedCount || 0}/
+                {data.multirbl?.totalChecked || 0}
+              </span>
             </div>
           </div>
 
-          {/* Additional details from the JSON */}
-          {data.abuseipdb?.lastReportedAt && (
+          {data.aiSummaryMeta?.model && (
             <div>
-              <div className="font-medium mb-1 text-muted-foreground">
-                Last Abuse Report
+              <div className="font-medium text-muted-foreground mb-1">
+                Model
               </div>
-              <div className="text-[10px] text-muted-foreground">
-                {new Date(data.abuseipdb.lastReportedAt).toLocaleString()}
+              <div className="text-[10px] font-mono">
+                {data.aiSummaryMeta.model}
               </div>
             </div>
           )}
 
-          {/* Source Attribution */}
-          {data.aiSummary?.sourcesContributingMost && (
+          {data.aiSummary?.sourcesContributingMost?.length > 0 && (
             <div>
-              <div className="font-medium mb-1 text-muted-foreground">
+              <div className="font-medium text-muted-foreground mb-1">
                 Sources
               </div>
               <div className="flex flex-wrap gap-1">
@@ -368,21 +405,21 @@ export function ThreatSummaryCard({
         <div className="flex border-t border-border">
           <button
             onClick={handleCopy}
-            className="flex-1 py-2.5 flex items-center justify-center gap-2 text-xs hover:bg-muted/50 active:bg-muted transition-colors"
+            className="flex-1 py-2.5 flex items-center justify-center gap-2 text-xs hover:bg-muted/50"
           >
             {copied ? (
               <Check className="h-3.5 w-3.5" />
             ) : (
               <ClipboardCopy className="h-3.5 w-3.5" />
             )}
-            {copied ? "Copied" : "Copy Summary"}
+            {copied ? "Copied" : "Copy"}
           </button>
           <button
             onClick={handleExport}
-            className="flex-1 py-2.5 flex items-center justify-center gap-2 text-xs hover:bg-muted/50 active:bg-muted transition-colors border-l border-border"
+            className="flex-1 py-2.5 flex items-center justify-center gap-2 text-xs hover:bg-muted/50 border-l border-border"
           >
             <Download className="h-3.5 w-3.5" />
-            Export JSON
+            Export
           </button>
         </div>
       )}
