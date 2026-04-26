@@ -5,7 +5,6 @@ const analysisController = require("../controllers/analysis.controller");
 const { authenticateToken } = require("../middlewares/auth.middleware");
 const rateLimiter = require("../middlewares/rateLimiter");
 
-// Protected routes (require authentication)
 router.post(
   "/analyze",
   authenticateToken,
@@ -29,7 +28,29 @@ router.delete(
 );
 router.get("/statistics", authenticateToken, analysisController.getStatistics);
 
-// Admin routes for API key management
+router.post("/save", authenticateToken, analysisController.saveAnalysis);
+router.get("/saved", authenticateToken, analysisController.getSavedAnalyses);
+router.delete(
+  "/saved/:id",
+  authenticateToken,
+  analysisController.deleteSavedAnalysis,
+);
+router.patch(
+  "/saved/:id/star",
+  authenticateToken,
+  analysisController.toggleStarred,
+);
+router.patch(
+  "/saved/:id",
+  authenticateToken,
+  analysisController.updateSavedAnalysis,
+);
+router.get(
+  "/saved/check/:analysisId",
+  authenticateToken,
+  analysisController.checkSavedStatus,
+);
+
 router.get(
   "/api-keys/status",
   authenticateToken,
@@ -41,7 +62,6 @@ router.post(
   analysisController.rotateAPIKeys,
 );
 
-// Public health check
 router.get("/health", (req, res) => {
   res.json({
     status: "✅ Advanced Cyber Intel Server Running",
@@ -50,38 +70,6 @@ router.get("/health", (req, res) => {
     cache_enabled: true,
     cache_duration: "24 hours",
     database: "MongoDB with TTL",
-    api_key_rotation: "enabled (auto-failover)",
-    features: {
-      multi_api_keys: true,
-      auto_rotation: true,
-      response_caching: true,
-      analysis_history: true,
-      ai_summary: true,
-    },
-    supported_sources: [
-      "VirusTotal",
-      "AbuseIPDB",
-      "OTX",
-      "ThreatFox",
-      "Pulsedive",
-      "GreyNoise",
-      "IPQualityScore",
-      "VPNAPI.io",
-      "Shodan",
-      "Censys",
-      "IPinfo",
-      "Cisco Talos",
-      "Multi-RBL",
-      "InQuest RepDB",
-      "ThreatMiner",
-      "MalwareURL",
-      "IOC.one",
-      "IPTeoh",
-      "IPify",
-      "URLScan.io",
-      "URLHaus",
-      "Sucuri SiteCheck",
-    ],
     timestamp: new Date().toISOString(),
   });
 });

@@ -1,8 +1,11 @@
 // src/components/AnalysisResults.tsx
 import { motion } from "framer-motion";
 import { Shield } from "lucide-react";
+import { toast } from "sonner";
 import type { ThreatData } from "@/types/threat";
 import { ThreatSummaryCard } from "./ThreatSummaryCard";
+import { threatToCSV, threatToJSON, threatToPDF } from "@/utils/exportUtils";
+import { api } from "@/lib/api";
 
 // IP Cards
 import { AbuseIPDBCard } from "./cards/AbuseIPDBCard";
@@ -24,7 +27,6 @@ import { InQuestCard } from "./cards/InQuestCard";
 import { URLScanCard } from "./cards/URLScanCard";
 import { URLHausCard } from "./cards/URLHausCard";
 import { SucuriCard } from "./cards/SucuriCard";
-import { log } from "console";
 
 export function AnalysisResults({ data }: { data: ThreatData }) {
   const inputType = data.inputType || "ip";
@@ -32,34 +34,82 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
   const isURL = inputType === "url";
   const isDomain = inputType === "domain";
   const isHash = inputType === "hash";
-  console.log("ThreatData", data);
+
+  const handleExport = async (format: "json" | "csv" | "pdf") => {
+    let blob: Blob;
+    let filename: string;
+
+    switch (format) {
+      case "json":
+        blob = new Blob([threatToJSON(data)], { type: "application/json" });
+        filename = `threat-${data.input}-${Date.now()}.json`;
+        break;
+      case "csv":
+        blob = new Blob([threatToCSV(data)], { type: "text/csv" });
+        filename = `threat-${data.input}-${Date.now()}.csv`;
+        break;
+      case "pdf":
+        blob = await threatToPDF(data);
+        filename = `threat-${data.input}-${Date.now()}.html`;
+        break;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported as ${format.toUpperCase()}`);
+  };
+
+  const handleSave = async () => {
+    if (!data.analysisId) {
+      toast.error("Cannot save: No analysis ID found");
+      return;
+    }
+
+    try {
+      const response = await api.post("/save", {
+        analysisId: data.analysisId,
+        notes: "",
+        tags: [],
+      });
+
+      if (response.data.success) {
+        toast.success("Analysis saved to your collection");
+      }
+    } catch (err: any) {
+      if (err.response?.data?.error?.includes("already saved")) {
+        toast.info("Analysis already saved");
+      } else {
+        toast.error("Failed to save analysis");
+      }
+    }
+  };
 
   const availableCards = [
-    // VirusTotal (always show if available)
     {
       id: "vt",
       condition: data.vt && Object.keys(data.vt).length > 0,
       component: <VirusTotalCard data={data.vt!} />,
     },
-    // OTX (always show)
     {
       id: "otx",
       condition: data.otx && data.otx.pulse_count !== undefined,
       component: <OTXCard data={data.otx!} />,
     },
-    // Pulsedive
     {
       id: "pulsedive",
       condition: data.pulsedive && Object.keys(data.pulsedive).length > 0,
       component: <PulsediveCard data={data.pulsedive!} />,
     },
-    // InQuest
     {
       id: "inquest",
       condition: data.inquest && data.inquest.reputation_hits !== undefined,
       component: <InQuestCard data={data.inquest!} />,
     },
-    // IP-specific cards
     {
       id: "abuseipdb",
       condition:
@@ -106,7 +156,6 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
       condition: isIP && data.ipteoh && Object.keys(data.ipteoh).length > 0,
       component: <IPTeohCard data={data.ipteoh!} />,
     },
-    // URL-specific cards
     {
       id: "urlscan",
       condition:
@@ -123,7 +172,6 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
         Object.keys(data.urlhaus).length > 0,
       component: <URLHausCard data={data.urlhaus!} />,
     },
-    // Domain-specific cards
     {
       id: "sucuri",
       condition:
@@ -142,10 +190,13 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
       animate={{ opacity: 1 }}
       className="max-w-6xl mx-auto space-y-3 px-3 py-3"
     >
-      {/* Unified Threat Summary Card */}
-      <ThreatSummaryCard data={data} showActions={true} />
+      <ThreatSummaryCard
+        data={data}
+        showActions={true}
+        onExport={handleExport}
+        onSave={handleSave}
+      />
 
-      {/* Intelligence Cards Grid */}
       {visibleCards.length > 0 && (
         <div className="space-y-3">
           {visibleCards.map((card, index) => (
@@ -161,7 +212,6 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
         </div>
       )}
 
-      {/* Empty State */}
       {visibleCards.length === 0 && (
         <div className="bg-card border border-border/20 py-8">
           <div className="text-center">
