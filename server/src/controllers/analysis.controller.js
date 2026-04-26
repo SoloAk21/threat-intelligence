@@ -1,8 +1,7 @@
 // src/controllers/analysis.controller.js
 const threatService = require("../services/threat.service");
-const { calculateRiskScore } = require("../utils/riskCalculator");
 const { detectInputType } = require("../utils/inputDetector");
-const { generateThreatSummary } = require("../services/gemini.service");
+const { generateThreatSummaryAndRisk } = require("../services/gemini.service");
 const Analysis = require("../models/Analysis");
 const apiKeyManager = require("../services/apiKeyManager");
 
@@ -190,8 +189,11 @@ const analyze = async (req, res, next) => {
       );
     }
 
-    // Calculate risk score
-    const riskScore = calculateRiskScore({
+    // Prepare data for Gemini
+    const threatData = {
+      input: trimmedInput,
+      type: analysisType,
+      timestamp: new Date().toISOString(),
       vt,
       abuseipdb,
       otx,
@@ -201,73 +203,66 @@ const analyze = async (req, res, next) => {
       ipqualityscore,
       vpnapi,
       shodan,
+      censys,
+      ipinfo,
       talos,
       multirbl,
       inquest,
       threatminer,
       malwareurl,
+      iocone,
       ipify,
+      ipteoh,
       urlscan,
       urlhaus,
       sucuri,
-      analysisType,
-    });
+    };
 
-    const riskLevel =
-      riskScore >= 80
-        ? "CRITICAL"
-        : riskScore >= 60
-          ? "HIGH"
-          : riskScore >= 40
-            ? "MEDIUM"
-            : "LOW";
-
-    // Generate AI summary
+    // Generate AI summary with risk score
     let aiSummary = null,
       aiSummaryMeta = null;
+    let riskScore = 0;
+    let riskLevel = "LOW";
+
     try {
-      const geminiResult = await generateThreatSummary({
-        success: true,
-        data: {
-          input: trimmedInput,
-          type: analysisType,
-          riskScore,
-          riskLevel,
-          timestamp: new Date().toISOString(),
-          vt,
-          abuseipdb,
-          otx,
-          threatfox,
-          pulsedive,
-          greynoise,
-          ipqualityscore,
-          vpnapi,
-          shodan,
-          censys,
-          ipinfo,
-          talos,
-          multirbl,
-          inquest,
-          threatminer,
-          malwareurl,
-          urlscan,
-          urlhaus,
-          sucuri,
-        },
-      });
+      const geminiResult = await generateThreatSummaryAndRisk(threatData);
 
       if (geminiResult.success) {
         aiSummary = geminiResult.summary;
+        riskScore = geminiResult.riskScore;
+        riskLevel = geminiResult.riskLevel;
         aiSummaryMeta = {
           generatedAt: new Date().toISOString(),
           model: geminiResult.modelUsed,
           promptTokens: geminiResult.rawPromptTokens || 0,
           responseTokens: geminiResult.rawResponseTokens || 0,
+          riskCalculatedBy: "gemini-ai",
         };
+      } else {
+        // Fallback to simple risk calculation if Gemini fails
+        riskScore = calculateFallbackRisk(threatData);
+        riskLevel =
+          riskScore >= 80
+            ? "CRITICAL"
+            : riskScore >= 60
+              ? "HIGH"
+              : riskScore >= 40
+                ? "MEDIUM"
+                : "LOW";
+        aiSummaryMeta = { error: geminiResult.error, fallbackUsed: true };
       }
     } catch (summaryErr) {
       console.warn("⚠️ AI Summary failed:", summaryErr.message);
-      aiSummaryMeta = { error: summaryErr.message };
+      riskScore = calculateFallbackRisk(threatData);
+      riskLevel =
+        riskScore >= 80
+          ? "CRITICAL"
+          : riskScore >= 60
+            ? "HIGH"
+            : riskScore >= 40
+              ? "MEDIUM"
+              : "LOW";
+      aiSummaryMeta = { error: summaryErr.message, fallbackUsed: true };
     }
 
     // Prepare for database storage
@@ -310,7 +305,7 @@ const analyze = async (req, res, next) => {
 
     // Save to database asynchronously
     const analysis = new Analysis(analysisData);
-    analysis.compressResponses(); // Compress before saving
+    analysis.compressResponses();
     analysis
       .save()
       .catch((err) => console.error("Failed to save analysis:", err));
@@ -358,7 +353,44 @@ const analyze = async (req, res, next) => {
   }
 };
 
-// Get analysis history for the authenticated user
+// Simple fallback risk calculation if Gemini fails
+const calculateFallbackRisk = (data) => {
+  let riskScore = 0;
+  let factors = 0;
+
+  // VirusTotal
+  if (data.vt?.last_analysis_stats?.malicious) {
+    riskScore += Math.min(40, data.vt.last_analysis_stats.malicious * 8);
+    factors++;
+  }
+
+  // AbuseIPDB
+  if (data.abuseipdb?.abuseConfidenceScore) {
+    riskScore += data.abuseipdb.abuseConfidenceScore * 0.4;
+    factors++;
+  }
+
+  // GreyNoise
+  if (data.greynoise?.classification === "malicious") {
+    riskScore += 35;
+    factors++;
+  } else if (data.greynoise?.classification === "benign") {
+    riskScore += 5;
+    factors++;
+  }
+
+  // IPQS
+  if (data.ipqualityscore?.fraud_score) {
+    riskScore += data.ipqualityscore.fraud_score * 0.35;
+    factors++;
+  }
+
+  return factors > 0
+    ? Math.min(100, Math.round((riskScore / factors) * 1.5))
+    : 0;
+};
+
+// ... rest of the controller functions remain the same ...
 const getAnalysisHistory = async (req, res) => {
   try {
     const userId = req.userId;
@@ -406,7 +438,6 @@ const getAnalysisHistory = async (req, res) => {
   }
 };
 
-// Get single analysis by ID
 const getAnalysisById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -425,7 +456,6 @@ const getAnalysisById = async (req, res) => {
   }
 };
 
-// Delete analysis
 const deleteAnalysis = async (req, res) => {
   try {
     const { id } = req.params;
@@ -444,7 +474,6 @@ const deleteAnalysis = async (req, res) => {
   }
 };
 
-// Get user statistics
 const getStatistics = async (req, res) => {
   try {
     const userId = req.userId;
@@ -511,7 +540,6 @@ const getStatistics = async (req, res) => {
   }
 };
 
-// Get API key status (admin only)
 const getAPIKeyStatus = async (req, res) => {
   try {
     const services = [
@@ -544,7 +572,6 @@ const getAPIKeyStatus = async (req, res) => {
   }
 };
 
-// Rotate API keys manually
 const rotateAPIKeys = async (req, res) => {
   try {
     const { service } = req.body;
