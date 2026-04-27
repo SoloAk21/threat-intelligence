@@ -246,10 +246,9 @@ function Layout() {
               <div className="relative">
                 <div className="absolute inset-0 bg-brand-primary/20 blur-md rounded-lg" />
                 <div className="relative flex items-center justify-center w-8 h-8 lg:w-9 lg:h-9 bg-gradient-to-br from-brand-primary to-brand-primary-dark rounded-lg shadow-sm">
-                  <Shield
-                    className="h-4 w-4 lg:h-4.5 lg:w-4.5 text-white"
-                    strokeWidth={1.75}
-                  />
+                  <div className="p-2 bg-primary/10 border border-primary/30">
+                    <Shield className="h-5 w-5 text-primary" />
+                  </div>
                 </div>
               </div>
               <div className="flex flex-col">

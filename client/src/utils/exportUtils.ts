@@ -548,12 +548,12 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
 
   // VirusTotal details
   const vtStats = data.vt?.last_analysis_stats || {};
-  const totalDetections = (vtStats.malicious || 0) + (vtStats.suspicious || 0);
-  const totalEngines =
-    (vtStats.malicious || 0) +
-    (vtStats.suspicious || 0) +
-    (vtStats.harmless || 0) +
-    (vtStats.undetected || 0);
+  //   const totalDetections = (vtStats.malicious || 0) + (vtStats.suspicious || 0);
+  //   const totalEngines =
+  //     (vtStats.malicious || 0) +
+  //     (vtStats.suspicious || 0) +
+  //     (vtStats.harmless || 0) +
+  //     (vtStats.undetected || 0);
 
   pdf.setFontSize(11);
   pdf.setFont("helvetica", "bold");

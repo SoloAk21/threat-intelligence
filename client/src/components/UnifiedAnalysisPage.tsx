@@ -65,7 +65,6 @@ export function UnifiedAnalysisPage() {
           description: `${response.data.riskLevel} risk detected`,
         });
       } else {
-        console.error("Invalid response data:", response);
         toast.error("Received invalid data from server");
       }
     },
@@ -147,27 +146,19 @@ export function UnifiedAnalysisPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 px-3 py-3 animate-fade-in">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 border border-primary/30">
-            <Shield className="h-5 w-5 text-primary" />
-          </div>
+        <div className="flex items-center flex-1 justify-center gap-3">
           <div>
-            <h1 className="text-sm font-bold text-foreground uppercase tracking-wide">
+            <h1 className="text-2xl sm:text-4xl  font-bold text-foreground  tracking-wide">
               Cyber Threat Intelligence
             </h1>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[10px] text-center text-muted-foreground">
               25+ Sources • IP • URL • Domain • Hash • Email
             </p>
           </div>
         </div>
-        <div className="text-[9px] text-muted-foreground/50 px-2 py-1 bg-muted/30">
-          ThreatScope v1.0
-        </div>
       </div>
 
-      {/* Main Input Card */}
       <div className="bg-card border-l-2 border-primary/60">
         <div className="px-3 py-2 border-b border-border/20 flex items-center gap-2 bg-muted/5">
           <div className="flex items-center gap-1.5">
@@ -177,7 +168,7 @@ export function UnifiedAnalysisPage() {
             </span>
           </div>
           {detectedType && (
-            <span className="text-[9px] text-muted-foreground/50 px-1.5 py-0.5 bg-primary/10  border border-primary/30 flex items-center gap-1">
+            <span className="text-[9px] text-muted-foreground/50 px-1.5 py-0.5 bg-primary/10 border border-primary/30 flex items-center gap-1">
               {getTypeIcon()}
               {getTypeLabel()}
             </span>
@@ -241,7 +232,6 @@ export function UnifiedAnalysisPage() {
           </div>
         </div>
 
-        {/* Examples */}
         {!currentInput && (
           <div className="px-3 pb-2 flex items-center gap-2 text-[9px] border-t border-border/20 pt-2">
             <span className="text-muted-foreground/50">Try:</span>
@@ -259,7 +249,6 @@ export function UnifiedAnalysisPage() {
         )}
       </div>
 
-      {/* Recent History */}
       {history.length > 0 && !result && !mutation.isPending && (
         <div className="bg-card border border-border/20">
           <div className="px-3 py-2 border-b border-border/20 bg-muted/5 flex items-center justify-between">
@@ -320,11 +309,9 @@ export function UnifiedAnalysisPage() {
         </div>
       )}
 
-      {/* Results */}
       {mutation.isPending && <ResultSkeleton />}
       {result && !mutation.isPending && <AnalysisResults data={result} />}
 
-      {/* Empty State */}
       {!result && !mutation.isPending && history.length === 0 && (
         <div className="bg-card border border-border/20 py-20">
           <div className="text-center">

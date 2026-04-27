@@ -175,15 +175,14 @@ export const UserMenu: React.FC = () => {
   };
 
   const strength = passwordStrength();
-
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="relative group focus:outline-none">
             <div className="absolute inset-0 rounded-full bg-brand-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <Avatar className="h-8 w-8 lg:h-9 lg:w-9 transition-all duration-200 group-hover:scale-105 cursor-pointer rounded-full border border-border/50 group-hover:border-brand-primary/50">
-              <AvatarFallback className="bg-gradient-to-br from-brand-primary to-brand-primary-dark text-white text-xs font-semibold rounded-full">
+            <Avatar className="h-8 w-8 lg:h-9 lg:w-9 transition-all duration-200 group-hover:scale-105 cursor-pointer border border-border/50 group-hover:border-brand-primary/50">
+              <AvatarFallback className="bg-gradient-to-br text-foreground from-brand-primary to-brand-primary-dark  text-xs font-semibold">
                 {getInitials(user.username)}
               </AvatarFallback>
             </Avatar>

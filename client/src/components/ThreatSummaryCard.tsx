@@ -18,13 +18,11 @@ import {
   X,
   Loader2,
   Save,
-  MoreHorizontal,
   Activity,
   MapPin,
   Server,
   Globe,
   Zap,
-  TrendingUp,
   TrendingDown,
 } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
@@ -37,8 +35,7 @@ interface ThreatSummaryCardProps {
   showActions?: boolean;
   onExport?: (format: "json" | "csv" | "pdf") => void;
   onCopy?: () => void;
-  onSave?: (data: { notes: string; tags: string[] }) => Promise<void>;
-  onDelete?: (id: string) => Promise<void>;
+  onSave?: () => void;
   savedAnalysisId?: string;
   isSaved?: boolean;
 }
@@ -49,7 +46,6 @@ export function ThreatSummaryCard({
   onExport,
   onCopy,
   onSave,
-  onDelete,
   savedAnalysisId,
   isSaved: externalIsSaved,
 }: ThreatSummaryCardProps) {
@@ -194,13 +190,7 @@ export function ThreatSummaryCard({
     setSaving(true);
     try {
       if (onSave) {
-        await onSave({
-          notes: saveNotes,
-          tags: saveTags
-            .split(",")
-            .map((t) => t.trim())
-            .filter(Boolean),
-        });
+        await onSave();
       } else {
         const response = await api.post("/save", {
           analysisId: data.analysisId,
@@ -211,9 +201,9 @@ export function ThreatSummaryCard({
             .filter(Boolean),
         });
         if (response.data.success) {
-          setIsSaved(true);
+          setIsSaved(response.data.data.saved);
           setExistingSavedId(response.data.data._id);
-          toast.success(isSaved ? "Analysis updated" : "Analysis saved");
+          toast.success(response.data.message);
         }
       }
       setShowSaveModal(false);
@@ -229,17 +219,19 @@ export function ThreatSummaryCard({
 
     setDeleting(true);
     try {
-      if (onDelete) {
-        await onDelete(existingSavedId);
-      } else {
-        await api.delete(`/saved/${existingSavedId}`);
+      const response = await api.post("/save", {
+        analysisId: data.analysisId,
+        notes: "",
+        tags: [],
+      });
+      if (response.data.success && !response.data.data.saved) {
+        setIsSaved(false);
+        setExistingSavedId(null);
+        setShowDeleteConfirm(false);
+        toast.success("Removed from saved");
       }
-      setIsSaved(false);
-      setExistingSavedId(null);
-      setShowDeleteConfirm(false);
-      toast.success("Removed from saved");
     } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to delete");
+      toast.error(err.response?.data?.error || "Failed to remove");
     } finally {
       setDeleting(false);
     }
@@ -250,7 +242,6 @@ export function ThreatSummaryCard({
   return (
     <>
       <div className="bg-card border border-border/30 shadow-sm">
-        {/* Hero Section - Gradient Header */}
         <div
           className={`relative overflow-hidden ${getRiskBg(riskScore)} border-b border-border/30`}
         >
@@ -258,7 +249,6 @@ export function ThreatSummaryCard({
 
           <div className="p-6">
             <div className="flex items-start justify-between">
-              {/* Left: Icon & Title */}
               <div className="flex items-start gap-4">
                 <div
                   className={`p-3 ${getRiskBg(riskScore)} border ${getRiskColor(riskScore)}/20`}
@@ -310,9 +300,7 @@ export function ThreatSummaryCard({
                 </div>
               </div>
 
-              {/* Right: Risk Score & Actions */}
               <div className="flex items-center gap-6">
-                {/* Risk Score Circle */}
                 <div className="text-center">
                   <div className="relative">
                     <svg className="w-20 h-20 transform -rotate-90">
@@ -349,8 +337,6 @@ export function ThreatSummaryCard({
                     </div>
                   </div>
                 </div>
-
-                {/* Risk Badge */}
                 <div
                   className={`px-3 py-1.5 ${riskBadge.bg} text-${riskBadge.text} text-xs font-bold uppercase tracking-wider`}
                 >
@@ -361,12 +347,10 @@ export function ThreatSummaryCard({
           </div>
         </div>
 
-        {/* Action Bar - Creative Design */}
         {showActions && data.analysisId && (
           <div className="px-6 py-3 border-b border-border/30 bg-muted/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                {/* Security Detection Pills */}
                 {(isVPN || isProxy || isTor || isNoise || isRiot) && (
                   <div className="flex items-center gap-2">
                     <Activity className="h-3.5 w-3.5 text-muted-foreground" />
@@ -401,7 +385,6 @@ export function ThreatSummaryCard({
                 )}
               </div>
 
-              {/* Action Buttons Group */}
               <div className="flex items-center gap-1">
                 {isSaved ? (
                   <>
@@ -475,7 +458,6 @@ export function ThreatSummaryCard({
           </div>
         )}
 
-        {/* AI Summary Section */}
         {data.aiSummary && (
           <div className="px-6 py-5 border-b border-border/30">
             <div className="flex items-center gap-2 mb-4">
@@ -500,7 +482,6 @@ export function ThreatSummaryCard({
               {data.aiSummary.executiveSummary}
             </p>
 
-            {/* Key Stats Row */}
             <div className="grid grid-cols-4 gap-3 mb-5">
               <div className="p-2 border-l-2 border-primary/30 bg-muted/5">
                 <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
@@ -616,7 +597,6 @@ export function ThreatSummaryCard({
           </div>
         )}
 
-        {/* IPQS Warning */}
         {ipqsError && (
           <div className="px-6 py-2 border-b border-amber-500/20 bg-amber-500/5">
             <p className="text-[10px] text-amber-600 flex items-center gap-1">
@@ -625,21 +605,18 @@ export function ThreatSummaryCard({
           </div>
         )}
 
-        {/* Toggle Details */}
         <button
           onClick={() => setShowDetails(!showDetails)}
           className="w-full px-6 py-3 text-[11px] flex items-center justify-between hover:bg-muted/10 transition-colors text-muted-foreground border-b border-border/30"
         >
           <span className="uppercase tracking-wider flex items-center gap-2">
-            <Globe className="h-3 w-3" />
-            Technical Details
+            <Globe className="h-3 w-3" /> Technical Details
           </span>
           <ChevronRight
             className={`h-4 w-4 transition-transform duration-200 ${showDetails ? "rotate-90" : ""}`}
           />
         </button>
 
-        {/* Technical Details */}
         {showDetails && (
           <div className="px-6 py-4 text-sm space-y-4 bg-muted/5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4">

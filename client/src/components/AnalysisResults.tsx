@@ -7,7 +7,6 @@ import { ThreatSummaryCard } from "./ThreatSummaryCard";
 import { threatToCSV, threatToJSON, threatToPDF } from "@/utils/exportUtils";
 import { api } from "@/lib/api";
 
-// IP Cards
 import { AbuseIPDBCard } from "./cards/AbuseIPDBCard";
 import { GreyNoiseCard } from "./cards/GreyNoiseCard";
 import { CensysCard } from "./cards/CensysCard";
@@ -16,14 +15,10 @@ import { IPQualityScoreCard } from "./cards/IPQualityScoreCard";
 import { IPifyCard } from "./cards/IPifyCard";
 import { VPNAPICard } from "./cards/VPNAPICard";
 import { IPTeohCard } from "./cards/IPTeohCard";
-
-// Universal Cards
 import { VirusTotalCard } from "./cards/VirusTotalCard";
 import { OTXCard } from "./cards/OTXCard";
 import { PulsediveCard } from "./cards/PulsediveCard";
 import { InQuestCard } from "./cards/InQuestCard";
-
-// URL/Domain Cards
 import { URLScanCard } from "./cards/URLScanCard";
 import { URLHausCard } from "./cards/URLHausCard";
 import { SucuriCard } from "./cards/SucuriCard";
@@ -49,13 +44,8 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
         filename = `threat-${data.input}-${Date.now()}.csv`;
         break;
       case "pdf":
-        try {
-          blob = await threatToPDF(data);
-          filename = `threat-${data.input}-${Date.now()}.pdf`;
-        } catch (err) {
-          toast.error("PDF generation failed");
-          return;
-        }
+        blob = await threatToPDF(data);
+        filename = `threat-${data.input}-${Date.now()}.pdf`;
         break;
     }
 
@@ -83,7 +73,9 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
       });
 
       if (response.data.success) {
-        toast.success("Analysis saved to your collection");
+        toast.success(
+          response.data.message || "Analysis saved to your collection",
+        );
       }
     } catch (err: any) {
       if (err.response?.data?.error?.includes("already saved")) {

@@ -9,7 +9,6 @@ export interface GreyNoiseData {
   last_seen?: string;
   first_seen?: string;
   message?: string;
-  // Additional fields from raw data
   ip?: string;
   seen?: boolean;
   vpn?: boolean;
@@ -618,7 +617,6 @@ export interface AISummaryMeta {
 }
 
 export interface ThreatData {
-  // Core fields
   riskScore: number;
   riskLevel?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
   input: string;
@@ -627,8 +625,6 @@ export interface ThreatData {
   timestamp: string;
   analysisDuration?: number;
   analysisId?: string;
-
-  // Threat Intelligence Sources
   vt?: VirusTotalData;
   abuseipdb?: AbuseIPDBData;
   otx?: OTXData;
@@ -648,13 +644,9 @@ export interface ThreatData {
   threatminer?: ThreatMinerData;
   ipqualityscore?: IPQualityScoreData;
   ipify?: IPifyData;
-
-  // URL-specific sources
   urlscan?: URLScanData;
   urlhaus?: URLHausData;
   sucuri?: SucuriData;
-
-  // AI Summary
   aiSummary?: AISummary;
   aiSummaryMeta?: AISummaryMeta;
 }
@@ -673,7 +665,6 @@ export interface SearchHistoryItem {
   timestamp: string;
 }
 
-// Component Props Types
 export interface ThreatSummaryCardProps {
   data: ThreatData;
   showActions?: boolean;
@@ -693,7 +684,6 @@ export interface SourceBadgeProps {
   score?: number;
 }
 
-// Utility type for API responses
 export interface APIErrorResponse {
   success: false;
   error: string;

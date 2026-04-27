@@ -14,6 +14,7 @@ import {
   Server,
   AlertTriangle,
   Shield,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import ReactCountryFlag from "react-country-flag";
@@ -205,7 +206,6 @@ export function SavedAnalyses() {
                 key={item._id}
                 className="bg-card border border-border/30 hover:border-border/60 transition-all"
               >
-                {/* Header */}
                 <div className="px-4 py-3 flex items-center justify-between border-b border-border/20 bg-muted/10">
                   <div className="flex items-center gap-3">
                     <button
@@ -240,7 +240,6 @@ export function SavedAnalyses() {
                   </div>
                 </div>
 
-                {/* Quick Info Row */}
                 <div className="px-4 py-2 flex flex-wrap items-center gap-2 text-[10px] border-b border-border/20 bg-muted/5">
                   {country !== "XX" && (
                     <div className="flex items-center gap-1.5">
@@ -295,7 +294,6 @@ export function SavedAnalyses() {
                   )}
                 </div>
 
-                {/* AI Summary Preview */}
                 {item.aiSummary?.executiveSummary && (
                   <div className="px-4 py-2 text-xs text-muted-foreground/80 border-b border-border/20">
                     <p className="line-clamp-2">
@@ -304,7 +302,6 @@ export function SavedAnalyses() {
                   </div>
                 )}
 
-                {/* Tags Section */}
                 {item.tags && item.tags.length > 0 && (
                   <div className="px-4 py-2 flex flex-wrap items-center gap-2 border-b border-border/20">
                     <span className="text-[9px] text-muted-foreground">
@@ -323,7 +320,6 @@ export function SavedAnalyses() {
                   </div>
                 )}
 
-                {/* Actions */}
                 <div className="px-4 py-2 flex items-center justify-end gap-2 bg-muted/5">
                   <button
                     onClick={() => {
@@ -349,9 +345,8 @@ export function SavedAnalyses() {
                         confirm(
                           "Remove this analysis from your saved collection?",
                         )
-                      ) {
+                      )
                         deleteMutation.mutate(item._id);
-                      }
                     }}
                     className="p-1.5 hover:bg-red-500/10 rounded transition-colors"
                     title="Remove from saved"
@@ -365,7 +360,6 @@ export function SavedAnalyses() {
         </div>
       )}
 
-      {/* Edit Modal */}
       {selectedAnalysis && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-card border border-border w-[420px] max-w-[90vw] shadow-xl">
