@@ -49,8 +49,13 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
         filename = `threat-${data.input}-${Date.now()}.csv`;
         break;
       case "pdf":
-        blob = await threatToPDF(data);
-        filename = `threat-${data.input}-${Date.now()}.html`;
+        try {
+          blob = await threatToPDF(data);
+          filename = `threat-${data.input}-${Date.now()}.pdf`;
+        } catch (err) {
+          toast.error("PDF generation failed");
+          return;
+        }
         break;
     }
 
