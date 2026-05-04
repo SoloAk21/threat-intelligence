@@ -665,11 +665,14 @@ export interface SearchHistoryItem {
   timestamp: string;
 }
 
-export interface ThreatSummaryCardProps {
+interface ThreatSummaryCardProps {
   data: ThreatData;
   showActions?: boolean;
-  onExport?: () => void;
+  onExport?: (format: "json" | "csv" | "pdf") => void;
   onCopy?: () => void;
+  onSave?: () => void;
+  savedAnalysisId?: string;
+  isSaved?: boolean;
 }
 
 export interface ThreatScoreGaugeProps {

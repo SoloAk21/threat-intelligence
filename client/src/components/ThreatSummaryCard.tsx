@@ -6,7 +6,6 @@ import {
   Download,
   ClipboardCopy,
   Check,
-  ChevronDown,
   AlertTriangle,
   Eye,
   FileText,
@@ -24,11 +23,14 @@ import {
   Globe,
   Zap,
   TrendingDown,
+  Brain,
+  Network,
 } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 import type { ThreatData, GreyNoiseData } from "@/types/threat";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { downloadPDF, threatToCSV, threatToJSON } from "@/utils/exportUtils";
 
 interface ThreatSummaryCardProps {
   data: ThreatData;
@@ -39,6 +41,147 @@ interface ThreatSummaryCardProps {
   savedAnalysisId?: string;
   isSaved?: boolean;
 }
+
+const RISK_CONFIG = {
+  thresholds: { critical: 80, high: 60, medium: 40 },
+  levels: {
+    CRITICAL: {
+      color: "text-red-600",
+      bg: "bg-red-50 dark:bg-red-950/10",
+      badge: "bg-red-600",
+    },
+    HIGH: {
+      color: "text-orange-600",
+      bg: "bg-orange-50 dark:bg-orange-950/10",
+      badge: "bg-orange-600",
+    },
+    MEDIUM: {
+      color: "text-yellow-600",
+      bg: "bg-yellow-50 dark:bg-yellow-950/10",
+      badge: "bg-yellow-600",
+    },
+    LOW: {
+      color: "text-green-600",
+      bg: "bg-green-50 dark:bg-green-950/10",
+      badge: "bg-green-600",
+    },
+  },
+} as const;
+
+const RiskMeter = ({ score }: { score: number }) => {
+  const circumference = 2 * Math.PI * 34;
+  const dashOffset = circumference - (score / 100) * circumference;
+
+  return (
+    <div className="relative w-16 h-16 shrink-0">
+      <svg className="w-full h-full transform -rotate-90">
+        <circle
+          cx="32"
+          cy="32"
+          r="28"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          className="text-gray-200 dark:text-gray-700"
+        />
+        <circle
+          cx="32"
+          cy="32"
+          r="28"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          className={`transition-all duration-500 ${
+            score >= 80
+              ? "text-red-600"
+              : score >= 60
+                ? "text-orange-600"
+                : score >= 40
+                  ? "text-yellow-600"
+                  : "text-green-600"
+          }`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span
+          className={`text-lg font-bold ${
+            score >= 80
+              ? "text-red-600"
+              : score >= 60
+                ? "text-orange-600"
+                : score >= 40
+                  ? "text-yellow-600"
+                  : "text-green-600"
+          }`}
+        >
+          {score}
+        </span>
+        <span className="text-[7px] text-gray-500 -mt-0.5">/100</span>
+      </div>
+    </div>
+  );
+};
+
+const MetricCard = ({ label, value, subtext, color = "default" }: any) => (
+  <div className="p-2 border-l-2 border-teal-500/30 bg-gray-50/50 dark:bg-gray-900/30 rounded-r">
+    <div className="text-[9px] font-medium text-gray-500 uppercase tracking-wide">
+      {label}
+    </div>
+    <div
+      className={`text-base font-bold mt-0.5 ${
+        color === "critical"
+          ? "text-red-600"
+          : color === "high"
+            ? "text-orange-600"
+            : "text-gray-900 dark:text-gray-100"
+      }`}
+    >
+      {value}
+    </div>
+    {subtext && (
+      <div className="text-[8px] text-gray-500 mt-0.5">{subtext}</div>
+    )}
+  </div>
+);
+
+const Badge = ({ children, variant = "default" }: any) => {
+  const variants = {
+    default: "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300",
+    vpn: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300",
+    proxy:
+      "bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300",
+    tor: "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300",
+    scanner: "bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300",
+    riot: "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300",
+  };
+
+  return (
+    <span
+      className={`px-1.5 py-0.5 text-[9px] font-mono rounded ${variants[variant] || variants.default}`}
+    >
+      {children}
+    </span>
+  );
+};
+
+const ActionButton = ({
+  onClick,
+  icon: Icon,
+  title,
+  disabled = false,
+}: any) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="p-1.5 text-gray-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/30 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+    title={title}
+  >
+    <Icon className="h-3.5 w-3.5" />
+  </button>
+);
 
 export function ThreatSummaryCard({
   data,
@@ -62,79 +205,15 @@ export function ThreatSummaryCard({
   const [existingSavedId, setExistingSavedId] = useState(
     savedAnalysisId || null,
   );
+
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const saveModalRef = useRef<HTMLDivElement>(null);
 
   const riskScore = data.riskScore || 0;
-  const riskLevel = data.riskLevel;
+  const riskLevel = data.riskLevel || "LOW";
   const riskCalculatedByAI =
     data.aiSummaryMeta?.riskCalculatedBy === "gemini-ai";
   const fallbackUsed = data.aiSummaryMeta?.fallbackUsed === true;
-
-  useEffect(() => {
-    const checkSavedStatus = async () => {
-      if (!data.analysisId) return;
-      try {
-        const response = await api.get(`/saved/check/${data.analysisId}`);
-        if (response.data.saved) {
-          setIsSaved(true);
-          setExistingSavedId(response.data.id);
-        }
-      } catch (err) {}
-    };
-    if (externalIsSaved === undefined) {
-      checkSavedStatus();
-    } else {
-      setIsSaved(externalIsSaved);
-      setExistingSavedId(savedAnalysisId || null);
-    }
-  }, [data.analysisId, externalIsSaved, savedAnalysisId]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        exportMenuRef.current &&
-        !exportMenuRef.current.contains(event.target as Node)
-      ) {
-        setShowExportMenu(false);
-      }
-      if (
-        saveModalRef.current &&
-        !saveModalRef.current.contains(event.target as Node)
-      ) {
-        setShowSaveModal(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const getRiskColor = (score: number) => {
-    if (score >= 80) return "text-red-500";
-    if (score >= 60) return "text-orange-500";
-    if (score >= 40) return "text-amber-500";
-    return "text-emerald-500";
-  };
-
-  const getRiskBg = (score: number) => {
-    if (score >= 80) return "bg-red-500/5";
-    if (score >= 60) return "bg-orange-500/5";
-    if (score >= 40) return "bg-amber-500/5";
-    return "bg-emerald-500/5";
-  };
-
-  const getRiskBadge = (level: string) => {
-    switch (level) {
-      case "CRITICAL":
-        return { bg: "bg-red-500", text: "white" };
-      case "HIGH":
-        return { bg: "bg-orange-500", text: "white" };
-      case "MEDIUM":
-        return { bg: "bg-amber-500", text: "white" };
-      default:
-        return { bg: "bg-emerald-500", text: "white" };
-    }
-  };
 
   const abuseConfidence = data.abuseipdb?.abuseConfidenceScore || 0;
   const totalReports = data.abuseipdb?.totalReports || 0;
@@ -161,6 +240,44 @@ export function ThreatSummaryCard({
   const ipqsError = data.ipqualityscore?.raw?.success === false;
   const ipqsMessage = data.ipqualityscore?.raw?.message || "";
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowExportMenu(false);
+      }
+      if (
+        saveModalRef.current &&
+        !saveModalRef.current.contains(event.target as Node)
+      ) {
+        setShowSaveModal(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const checkSavedStatus = async () => {
+      if (!data.analysisId) return;
+      try {
+        const response = await api.get(`/saved/check/${data.analysisId}`);
+        if (response.data.saved) {
+          setIsSaved(true);
+          setExistingSavedId(response.data.id);
+        }
+      } catch (err) {}
+    };
+    if (externalIsSaved === undefined) {
+      checkSavedStatus();
+    } else {
+      setIsSaved(externalIsSaved);
+      setExistingSavedId(savedAnalysisId || null);
+    }
+  }, [data.analysisId, externalIsSaved, savedAnalysisId]);
+
   const handleCopy = () => {
     const summary = data.aiSummary?.executiveSummary || "No summary available";
     const text = `${data.input} | Risk: ${riskScore}/100 (${riskLevel}) | ${summary}`;
@@ -170,15 +287,41 @@ export function ThreatSummaryCard({
     onCopy?.();
   };
 
-  const handleExportClick = (format: "json" | "csv" | "pdf") => {
+  const handleExportClick = async (format: "json" | "csv" | "pdf") => {
     setShowExportMenu(false);
-    onExport?.(format);
-  };
 
-  const handleSaveClick = () => {
-    setSaveNotes("");
-    setSaveTags("");
-    setShowSaveModal(true);
+    try {
+      if (format === "json") {
+        const jsonData = threatToJSON(data);
+        const blob = new Blob([jsonData], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `threat-report-${data.input}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success("JSON report downloaded");
+      } else if (format === "csv") {
+        const csvData = threatToCSV(data);
+        const blob = new Blob([csvData], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `threat-report-${data.input}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success("CSV report downloaded");
+      } else if (format === "pdf") {
+        // Use background image from public folder
+        const bgImagePath = "/images/pdf-bg.png";
+        await downloadPDF(data, `threat-report-${data.input}.pdf`, bgImagePath);
+        toast.success("PDF report generated");
+      }
+      onExport?.(format);
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error(`Failed to generate ${format.toUpperCase()} report`);
+    }
   };
 
   const handleSaveConfirm = async () => {
@@ -237,323 +380,249 @@ export function ThreatSummaryCard({
     }
   };
 
-  const riskBadge = getRiskBadge(riskLevel || "LOW");
-
   return (
     <>
-      <div className="bg-card border border-border/30 shadow-sm">
+      <div className="bg-white dark:bg-gray-950 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+        {/* Header Section - Single Row Layout */}
         <div
-          className={`relative overflow-hidden ${getRiskBg(riskScore)} border-b border-border/30`}
+          className={`relative ${RISK_CONFIG.levels[riskLevel as keyof typeof RISK_CONFIG.levels]?.bg || RISK_CONFIG.levels.LOW.bg} p-4`}
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-primary/5 to-transparent pointer-events-none" />
+          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-teal-500/5 to-transparent pointer-events-none" />
 
-          <div className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div
-                  className={`p-3 ${getRiskBg(riskScore)} border ${getRiskColor(riskScore)}/20`}
-                >
-                  <Target className={`h-5 w-5 ${getRiskColor(riskScore)}`} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-mono text-lg font-semibold tracking-tight">
-                      {data.input}
+          <div className="relative flex items-center justify-between gap-4 flex-wrap lg:flex-nowrap">
+            {/* Left: IP Info */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div
+                className={`p-2 rounded-lg ${RISK_CONFIG.levels[riskLevel as keyof typeof RISK_CONFIG.levels]?.bg || RISK_CONFIG.levels.LOW.bg} shrink-0`}
+              >
+                <Target
+                  className={`h-4 w-4 ${RISK_CONFIG.levels[riskLevel as keyof typeof RISK_CONFIG.levels]?.color || RISK_CONFIG.levels.LOW.color}`}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-base font-semibold text-gray-900 dark:text-white truncate">
+                    {data.input}
+                  </span>
+                  <span className="text-[9px] font-mono text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                    {data.type?.toUpperCase() ||
+                      data.inputType?.toUpperCase() ||
+                      "IP"}
+                  </span>
+                  {riskCalculatedByAI && (
+                    <span className="inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300 rounded font-mono">
+                      <Zap className="h-2 w-2" /> AI Scored
                     </span>
-                    <span className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 font-mono">
-                      {data.type?.toUpperCase() ||
-                        data.inputType?.toUpperCase() ||
-                        "IP"}
-                    </span>
-                    {riskCalculatedByAI && (
-                      <span className="text-[9px] px-2 py-0.5 bg-primary/10 text-primary font-mono flex items-center gap-1">
-                        <Zap className="h-2.5 w-2.5" /> AI Scored
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="h-3 w-3" />
-                      {countryCode !== "XX" ? (
-                        <>
-                          <ReactCountryFlag
-                            countryCode={countryCode}
-                            svg
-                            style={{ width: "12px", height: "8px" }}
-                          />
-                          <span>
-                            {city && `${city}, `}
-                            {countryName}
-                          </span>
-                        </>
-                      ) : (
-                        <span>Location unknown</span>
-                      )}
-                    </div>
-                    {isp && (
-                      <div className="flex items-center gap-1.5">
-                        <Server className="h-3 w-3" />
-                        <span className="truncate max-w-[240px]">{isp}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6">
-                <div className="text-center">
-                  <div className="relative">
-                    <svg className="w-20 h-20 transform -rotate-90">
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="34"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        className="text-muted/20"
-                      />
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="34"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        strokeDasharray={`${riskScore * 2.136} 213.6`}
-                        className={getRiskColor(riskScore)}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span
-                        className={`text-2xl font-bold ${getRiskColor(riskScore)}`}
-                      >
-                        {riskScore}
-                      </span>
-                      <span className="text-[8px] text-muted-foreground -mt-1">
-                        /100
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  className={`px-3 py-1.5 ${riskBadge.bg} text-${riskBadge.text} text-xs font-bold uppercase tracking-wider`}
-                >
-                  {riskLevel || "LOW"}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {showActions && data.analysisId && (
-          <div className="px-6 py-3 border-b border-border/30 bg-muted/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {(isVPN || isProxy || isTor || isNoise || isRiot) && (
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                    <div className="flex gap-1.5">
-                      {isVPN && (
-                        <span className="px-2 py-0.5 text-[9px] font-mono bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                          VPN
-                        </span>
-                      )}
-                      {isProxy && (
-                        <span className="px-2 py-0.5 text-[9px] font-mono bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">
-                          Proxy
-                        </span>
-                      )}
-                      {isTor && (
-                        <span className="px-2 py-0.5 text-[9px] font-mono bg-red-500/10 text-red-500 border border-red-500/20">
-                          Tor
-                        </span>
-                      )}
-                      {isNoise && (
-                        <span className="px-2 py-0.5 text-[9px] font-mono bg-purple-500/10 text-purple-500 border border-purple-500/20">
-                          Scanner
-                        </span>
-                      )}
-                      {isRiot && (
-                        <span className="px-2 py-0.5 text-[9px] font-mono bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                          RIOT
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                {isSaved ? (
-                  <>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 text-emerald-600 text-[10px] font-mono border border-emerald-500/20">
-                      <Check className="h-3 w-3" />
-                      Saved
-                    </div>
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="p-2 text-red-500 hover:bg-red-500/10 transition-colors"
-                      title="Delete from saved"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={handleSaveClick}
-                    className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                    title="Save analysis"
-                  >
-                    <Bookmark className="h-4 w-4" />
-                  </button>
-                )}
-
-                <button
-                  onClick={handleCopy}
-                  className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                  title="Copy summary"
-                >
-                  {copied ? (
-                    <Check className="h-4 w-4 text-emerald-500" />
-                  ) : (
-                    <ClipboardCopy className="h-4 w-4" />
                   )}
-                </button>
+                </div>
 
-                <div className="relative" ref={exportMenuRef}>
-                  <button
-                    onClick={() => setShowExportMenu(!showExportMenu)}
-                    className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                    title="Export"
-                  >
-                    <Download className="h-4 w-4" />
-                  </button>
-                  {showExportMenu && (
-                    <div className="absolute top-full right-0 mt-1 w-36 bg-card border border-border/40 shadow-lg z-10">
-                      <button
-                        onClick={() => handleExportClick("json")}
-                        className="w-full px-3 py-2 text-xs text-left text-foreground hover:bg-muted/20 transition-colors flex items-center gap-2 border-b border-border/30"
-                      >
-                        <FileJson className="h-3.5 w-3.5" /> JSON
-                      </button>
-                      <button
-                        onClick={() => handleExportClick("csv")}
-                        className="w-full px-3 py-2 text-xs text-left text-foreground hover:bg-muted/20 transition-colors flex items-center gap-2 border-b border-border/30"
-                      >
-                        <FileSpreadsheet className="h-3.5 w-3.5" /> CSV
-                      </button>
-                      <button
-                        onClick={() => handleExportClick("pdf")}
-                        className="w-full px-3 py-2 text-xs text-left text-foreground hover:bg-muted/20 transition-colors flex items-center gap-2"
-                      >
-                        <FileText className="h-3.5 w-3.5" /> PDF
-                      </button>
+                <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {countryCode !== "XX" ? (
+                      <>
+                        <ReactCountryFlag
+                          countryCode={countryCode}
+                          svg
+                          style={{ width: "10px", height: "7px" }}
+                        />
+                        <span className="text-[11px]">
+                          {city && `${city}, `}
+                          {countryName}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[11px]">Location unknown</span>
+                    )}
+                  </div>
+                  {isp && (
+                    <div className="flex items-center gap-1 min-w-0">
+                      <Server className="h-3 w-3 shrink-0" />
+                      <span className="text-[11px] truncate">
+                        {isp.split(" ").slice(0, 3).join(" ")}
+                      </span>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {data.aiSummary && (
-          <div className="px-6 py-5 border-b border-border/30">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-1.5 bg-primary/10">
-                <Shield className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                Intelligence Summary
-              </span>
-              <div className="ml-auto flex items-center gap-2">
-                <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                  <Zap className="h-2.5 w-2.5" />
-                  <span>Powered by Gemini</span>
-                </div>
-                <span className="text-[9px] text-muted-foreground font-mono px-1.5 py-0.5 bg-muted/30">
-                  {data.aiSummaryMeta?.model?.split("-")[1] || "AI"}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-sm leading-relaxed text-foreground/85 mb-5">
-              {data.aiSummary.executiveSummary}
-            </p>
-
-            <div className="grid grid-cols-4 gap-3 mb-5">
-              <div className="p-2 border-l-2 border-primary/30 bg-muted/5">
-                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
-                  AbuseIPDB
-                </div>
-                <div
-                  className={`text-lg font-bold ${abuseConfidence >= 80 ? "text-red-500" : abuseConfidence >= 50 ? "text-orange-500" : "text-emerald-500"}`}
-                >
-                  {abuseConfidence}%
-                </div>
-                <div className="text-[9px] text-muted-foreground">
-                  {totalReports} reports
-                </div>
-              </div>
-              <div className="p-2 border-l-2 border-primary/30 bg-muted/5">
-                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
-                  VirusTotal
-                </div>
-                <div className="text-lg font-bold text-red-500">
-                  {vtMalicious}
-                </div>
-                <div className="text-[9px] text-muted-foreground">
-                  malicious
-                </div>
-              </div>
-              <div className="p-2 border-l-2 border-primary/30 bg-muted/5">
-                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
-                  OTX Pulses
-                </div>
-                <div className="text-lg font-bold">{otxPulses}</div>
-                <div className="text-[9px] text-muted-foreground">
-                  threat intel
-                </div>
-              </div>
-              <div className="p-2 border-l-2 border-primary/30 bg-muted/5">
-                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
-                  GreyNoise
-                </div>
-                <div
-                  className={`text-lg font-bold ${greyNoiseClassification === "malicious" ? "text-red-500" : greyNoiseClassification === "benign" ? "text-emerald-500" : "text-muted-foreground"}`}
-                >
-                  {greyNoiseClassification}
-                </div>
-                <div className="text-[9px] text-muted-foreground">
-                  {isNoise ? "active scanner" : "inactive"}
-                </div>
-              </div>
-            </div>
-
-            {data.aiSummary.riskAssessment && (
-              <div className="mb-4">
-                <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-                  <TrendingDown className="h-3 w-3" /> Risk Assessment
-                </div>
-                <div className="text-sm text-foreground/70 leading-relaxed">
-                  {data.aiSummary.riskAssessment.length > 200
-                    ? `${data.aiSummary.riskAssessment.substring(0, 200)}...`
-                    : data.aiSummary.riskAssessment}
+            {/* Center: Security Badges */}
+            {(isVPN || isProxy || isTor || isNoise || isRiot) && (
+              <div className="flex items-center gap-1.5">
+                <Activity className="h-3 w-3 text-gray-400" />
+                <div className="flex gap-1 flex-wrap">
+                  {isVPN && <Badge variant="vpn">VPN</Badge>}
+                  {isProxy && <Badge variant="proxy">Proxy</Badge>}
+                  {isTor && <Badge variant="tor">Tor</Badge>}
+                  {isNoise && <Badge variant="scanner">Scanner</Badge>}
+                  {isRiot && <Badge variant="riot">RIOT</Badge>}
                 </div>
               </div>
             )}
 
-            {data.aiSummary.keyIndicators?.length > 0 && (
-              <div className="mb-4">
-                <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-                  <Eye className="h-3 w-3" /> Key Indicators
+            {/* Right: Risk Score & Actions */}
+            <div className="flex items-center gap-4 shrink-0">
+              <RiskMeter score={riskScore} />
+              <div
+                className={`px-2.5 py-1 rounded-lg ${RISK_CONFIG.levels[riskLevel as keyof typeof RISK_CONFIG.levels]?.badge} text-white text-[10px] font-bold uppercase tracking-wider`}
+              >
+                {riskLevel}
+              </div>
+
+              {/* Actions */}
+              {showActions && data.analysisId && (
+                <div className="flex items-center gap-0.5 border-l border-gray-200 dark:border-gray-700 pl-3 ml-1">
+                  {isSaved ? (
+                    <>
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 text-[9px] font-mono rounded">
+                        <Check className="h-2.5 w-2.5" />
+                        Saved
+                      </div>
+                      <ActionButton
+                        onClick={() => setShowDeleteConfirm(true)}
+                        icon={Trash2}
+                        title="Remove from saved"
+                      />
+                    </>
+                  ) : (
+                    <ActionButton
+                      onClick={() => setShowSaveModal(true)}
+                      icon={Bookmark}
+                      title="Save analysis"
+                    />
+                  )}
+
+                  <ActionButton
+                    onClick={handleCopy}
+                    icon={copied ? Check : ClipboardCopy}
+                    title="Copy summary"
+                  />
+
+                  <div className="relative" ref={exportMenuRef}>
+                    <ActionButton
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      icon={Download}
+                      title="Export"
+                    />
+                    {showExportMenu && (
+                      <div className="absolute top-full right-0 mt-1 w-32 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 overflow-hidden">
+                        {[
+                          { format: "json", icon: FileJson, label: "JSON" },
+                          {
+                            format: "csv",
+                            icon: FileSpreadsheet,
+                            label: "CSV",
+                          },
+                          { format: "pdf", icon: FileText, label: "PDF" },
+                        ].map(({ format, icon: Icon, label }) => (
+                          <button
+                            key={format}
+                            onClick={() => handleExportClick(format as any)}
+                            className="w-full px-3 py-1.5 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+                          >
+                            <Icon className="h-3 w-3" /> {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* AI Summary Section */}
+        {data.aiSummary && (
+          <div className="p-5 border-t border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-lg bg-teal-100 dark:bg-teal-950">
+                  <Brain className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                </div>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+                  Intelligence Summary
+                </h3>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-0.5 text-[8px] text-gray-500">
+                  <Zap className="h-2 w-2" />
+                  <span>Gemini AI</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-4">
+              {data.aiSummary.executiveSummary}
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+              <MetricCard
+                label="AbuseIPDB"
+                value={`${abuseConfidence}%`}
+                subtext={`${totalReports} reports`}
+                color={
+                  abuseConfidence >= 80
+                    ? "critical"
+                    : abuseConfidence >= 50
+                      ? "high"
+                      : "default"
+                }
+              />
+              <MetricCard
+                label="VirusTotal"
+                value={vtMalicious}
+                subtext="malicious"
+                color={vtMalicious > 0 ? "critical" : "default"}
+              />
+              <MetricCard
+                label="OTX Pulses"
+                value={otxPulses}
+                subtext="threat intel"
+              />
+              <MetricCard
+                label="GreyNoise"
+                value={greyNoiseClassification}
+                subtext={isNoise ? "active scanner" : "inactive"}
+                color={
+                  greyNoiseClassification === "malicious"
+                    ? "critical"
+                    : "default"
+                }
+              />
+            </div>
+
+            {data.aiSummary.riskAssessment && (
+              <div className="mb-3 p-2.5 bg-gray-50 dark:bg-gray-900/50 rounded">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <TrendingDown className="h-3 w-3 text-gray-500" />
+                  <span className="text-[9px] font-medium text-gray-500 uppercase tracking-wide">
+                    Risk Assessment
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                  {data.aiSummary.riskAssessment.length > 200
+                    ? `${data.aiSummary.riskAssessment.substring(0, 200)}...`
+                    : data.aiSummary.riskAssessment}
+                </p>
+              </div>
+            )}
+
+            {data.aiSummary.keyIndicators?.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Eye className="h-3 w-3 text-gray-500" />
+                  <span className="text-[9px] font-medium text-gray-500 uppercase tracking-wide">
+                    Key Indicators
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
                   {data.aiSummary.keyIndicators.slice(0, 5).map((ind, i) => (
                     <span
                       key={i}
-                      className="text-[10px] px-2 py-1 bg-muted/20 border border-border/30 font-mono"
+                      className="text-[9px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded font-mono"
                     >
                       {ind}
                     </span>
@@ -563,15 +632,20 @@ export function ThreatSummaryCard({
             )}
 
             {data.aiSummary.recommendations?.length > 0 && (
-              <div className="mb-4">
-                <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" /> Recommendations
+              <div className="mb-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <AlertTriangle className="h-3 w-3 text-amber-500" />
+                  <span className="text-[9px] font-medium text-gray-500 uppercase tracking-wide">
+                    Recommendations
+                  </span>
                 </div>
-                <ul className="space-y-1.5">
+                <ul className="space-y-1">
                   {data.aiSummary.recommendations.slice(0, 3).map((rec, i) => (
-                    <li key={i} className="flex gap-2 text-sm">
-                      <span className="text-primary font-bold">→</span>
-                      <span className="text-foreground/70">{rec}</span>
+                    <li key={i} className="flex gap-1.5 text-xs">
+                      <span className="text-teal-500 font-bold">→</span>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {rec}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -579,17 +653,17 @@ export function ThreatSummaryCard({
             )}
 
             {data.aiSummary.tacticalAdvice && (
-              <div className="mt-4 pt-3 border-t border-border/30">
-                <p className="text-xs font-semibold text-primary flex items-center gap-1">
-                  <Zap className="h-3 w-3" /> Immediate Action:{" "}
+              <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-800">
+                <p className="text-[10px] font-semibold text-teal-600 dark:text-teal-400 flex items-center gap-1">
+                  <Zap className="h-2.5 w-2.5" /> Immediate Action:{" "}
                   {data.aiSummary.tacticalAdvice}
                 </p>
               </div>
             )}
 
             {fallbackUsed && (
-              <div className="mt-4 p-2 bg-amber-500/5 border-l-2 border-amber-500">
-                <p className="text-[10px] text-amber-600">
+              <div className="mt-3 p-1.5 bg-amber-50 dark:bg-amber-950/20 border-l-2 border-amber-500 rounded">
+                <p className="text-[9px] text-amber-700 dark:text-amber-400">
                   ⚠ AI service temporarily unavailable - using fallback scoring
                 </p>
               </div>
@@ -598,96 +672,78 @@ export function ThreatSummaryCard({
         )}
 
         {ipqsError && (
-          <div className="px-6 py-2 border-b border-amber-500/20 bg-amber-500/5">
-            <p className="text-[10px] text-amber-600 flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> {ipqsMessage}
+          <div className="px-5 py-1.5 bg-amber-50 dark:bg-amber-950/20 border-t border-amber-200 dark:border-amber-800">
+            <p className="text-[9px] text-amber-700 dark:text-amber-400 flex items-center gap-1">
+              <AlertTriangle className="h-2.5 w-2.5" /> {ipqsMessage}
             </p>
           </div>
         )}
 
+        {/* Technical Details Toggle */}
         <button
           onClick={() => setShowDetails(!showDetails)}
-          className="w-full px-6 py-3 text-[11px] flex items-center justify-between hover:bg-muted/10 transition-colors text-muted-foreground border-b border-border/30"
+          className="w-full px-5 py-2.5 text-[10px] flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors text-gray-500 border-t border-gray-200 dark:border-gray-800"
         >
-          <span className="uppercase tracking-wider flex items-center gap-2">
-            <Globe className="h-3 w-3" /> Technical Details
+          <span className="uppercase tracking-wider flex items-center gap-1.5">
+            <Network className="h-3 w-3" /> Technical Details
           </span>
           <ChevronRight
-            className={`h-4 w-4 transition-transform duration-200 ${showDetails ? "rotate-90" : ""}`}
+            className={`h-3.5 w-3.5 transition-transform duration-200 ${showDetails ? "rotate-90" : ""}`}
           />
         </button>
 
         {showDetails && (
-          <div className="px-6 py-4 text-sm space-y-4 bg-muted/5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4">
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">AbuseIPDB</span>
-                <span
-                  className={`font-mono font-medium ${abuseConfidence >= 80 ? "text-red-500" : ""}`}
+          <div className="px-5 py-3 text-xs space-y-3 bg-gray-50 dark:bg-gray-900/30">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <div className="text-[9px] text-gray-500">AbuseIPDB</div>
+                <div
+                  className={`font-mono text-xs ${abuseConfidence >= 80 ? "text-red-600" : ""}`}
                 >
-                  {abuseConfidence}%
-                </span>
+                  {abuseConfidence}% ({totalReports} reports)
+                </div>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">Reports</span>
-                <span className="font-mono">{totalReports}</span>
+              <div>
+                <div className="text-[9px] text-gray-500">VirusTotal</div>
+                <div className="font-mono text-xs">
+                  <span className="text-red-600">{vtMalicious} malicious</span>
+                  {vtSuspicious > 0 && (
+                    <span className="text-amber-600 ml-1">
+                      , {vtSuspicious} suspicious
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">VT Malicious</span>
-                <span className="font-mono text-red-500">{vtMalicious}</span>
+              <div>
+                <div className="text-[9px] text-gray-500">OTX</div>
+                <div className="font-mono text-xs">{otxPulses} pulses</div>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">VT Suspicious</span>
-                <span className="font-mono text-amber-500">{vtSuspicious}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">OTX Pulses</span>
-                <span className="font-mono">{otxPulses}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">GreyNoise</span>
-                <span
-                  className={`font-mono ${greyNoiseClassification === "malicious" ? "text-red-500" : ""}`}
+              <div>
+                <div className="text-[9px] text-gray-500">GreyNoise</div>
+                <div
+                  className={`font-mono text-xs ${greyNoiseClassification === "malicious" ? "text-red-600" : ""}`}
                 >
-                  {greyNoiseClassification}
-                </span>
+                  {greyNoiseClassification} {isNoise && "(active)"}
+                </div>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">RBL Listed</span>
-                <span
-                  className={`font-mono ${(data.multirbl?.listedCount || 0) > 0 ? "text-red-500" : "text-emerald-500"}`}
+              <div>
+                <div className="text-[9px] text-gray-500">RBL Status</div>
+                <div
+                  className={`font-mono text-xs ${(data.multirbl?.listedCount || 0) > 0 ? "text-red-600" : "text-green-600"}`}
                 >
                   {data.multirbl?.listedCount || 0}/
-                  {data.multirbl?.totalChecked || 0}
-                </span>
+                  {data.multirbl?.totalChecked || 0} blocks
+                </div>
               </div>
             </div>
 
             {data.aiSummaryMeta?.model && (
-              <div className="pt-2 border-t border-border/30">
-                <div className="text-[10px] text-muted-foreground mb-1">
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+                <div className="text-[9px] text-gray-500 mb-0.5">
                   Analysis Model
                 </div>
-                <div className="text-xs font-mono text-foreground/70">
+                <div className="text-[10px] font-mono text-gray-600 dark:text-gray-400">
                   {data.aiSummaryMeta.model}
-                </div>
-              </div>
-            )}
-
-            {data.aiSummary?.sourcesContributingMost?.length > 0 && (
-              <div className="pt-2 border-t border-border/30">
-                <div className="text-[10px] text-muted-foreground mb-1">
-                  Intelligence Sources
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {data.aiSummary.sourcesContributingMost.map((source, i) => (
-                    <span
-                      key={i}
-                      className="text-[10px] px-2 py-0.5 border border-border/30 font-mono"
-                    >
-                      {source}
-                    </span>
-                  ))}
                 </div>
               </div>
             )}
@@ -697,72 +753,79 @@ export function ThreatSummaryCard({
 
       {/* Save Modal */}
       {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowSaveModal(false)}
+        >
           <div
             ref={saveModalRef}
-            className="bg-card border border-border/40 w-[440px] max-w-[90vw] shadow-xl"
+            className="bg-white dark:bg-gray-900 rounded-xl w-[400px] max-w-[90vw] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 border-b border-border/30 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-primary/10">
-                  <Bookmark className="h-4 w-4 text-primary" />
+                <div className="p-1.5 rounded-lg bg-teal-100 dark:bg-teal-950">
+                  <Bookmark className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
                 </div>
-                <h3 className="text-xs font-bold uppercase tracking-wide">
+                <h3 className="text-sm font-semibold">
                   {isSaved ? "Update Saved Analysis" : "Save Analysis"}
                 </h3>
               </div>
               <button
                 onClick={() => setShowSaveModal(false)}
-                className="p-1 hover:bg-muted/20 transition-colors"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
+
+            <div className="p-4 space-y-3">
               <div>
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide block mb-1.5">
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300 block mb-1">
                   Notes
                 </label>
                 <textarea
                   value={saveNotes}
                   onChange={(e) => setSaveNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-transparent border border-border/40 focus:outline-none focus:border-primary/50 transition-colors"
+                  className="w-full px-2.5 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   rows={3}
-                  placeholder="Add your observations, context, or investigation notes..."
+                  placeholder="Add your notes..."
                 />
               </div>
+
               <div>
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide block mb-1.5">
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300 block mb-1">
                   Tags
                 </label>
                 <input
                   type="text"
                   value={saveTags}
                   onChange={(e) => setSaveTags(e.target.value)}
-                  placeholder="malware, c2, phishing, apt"
-                  className="w-full px-3 py-2 text-sm bg-transparent border border-border/40 focus:outline-none focus:border-primary/50 transition-colors"
+                  placeholder="malware, c2, phishing"
+                  className="w-full px-2.5 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
-                <p className="text-[9px] text-muted-foreground mt-1">
-                  Separate tags with commas for easy filtering
+                <p className="text-[9px] text-gray-500 mt-1">
+                  Separate tags with commas
                 </p>
               </div>
             </div>
-            <div className="px-5 py-4 border-t border-border/30 flex gap-3">
+
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex gap-2">
               <button
                 onClick={handleSaveConfirm}
                 disabled={saving}
-                className="flex-1 py-2 bg-primary text-white text-[11px] font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-1.5 bg-teal-600 text-white text-xs font-medium rounded hover:bg-teal-700 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {saving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  <Save className="h-3.5 w-3.5" />
+                  <Save className="h-3 w-3" />
                 )}
                 {saving ? "Saving..." : isSaved ? "Update" : "Save"}
               </button>
               <button
                 onClick={() => setShowSaveModal(false)}
-                className="flex-1 py-2 bg-muted/20 text-muted-foreground text-[11px] font-medium hover:bg-muted/30 transition-colors"
+                className="flex-1 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-medium rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
@@ -771,42 +834,48 @@ export function ThreatSummaryCard({
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-card border border-border/40 w-[400px] max-w-[90vw] shadow-xl">
-            <div className="px-5 py-4 border-b border-border/30 flex items-center gap-2">
-              <div className="p-1.5 bg-red-500/10">
-                <Trash2 className="h-4 w-4 text-red-500" />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl w-[360px] max-w-[90vw] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
+              <div className="p-1 rounded-lg bg-red-100 dark:bg-red-950">
+                <Trash2 className="h-3.5 w-3.5 text-red-600" />
               </div>
-              <h3 className="text-xs font-bold uppercase tracking-wide">
-                Delete Saved Analysis
-              </h3>
+              <h3 className="text-sm font-semibold">Delete Saved Analysis</h3>
             </div>
-            <div className="p-5">
-              <p className="text-sm text-foreground/80">
-                Remove this analysis from your saved collection?
+
+            <div className="p-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Remove this analysis from saved collection?
               </p>
-              <p className="text-xs text-muted-foreground mt-1.5">
+              <p className="text-xs text-gray-500 mt-1">
                 This action cannot be undone.
               </p>
             </div>
-            <div className="px-5 py-4 border-t border-border/30 flex gap-3">
+
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex gap-2">
               <button
                 onClick={handleDeleteConfirm}
                 disabled={deleting}
-                className="flex-1 py-2 bg-red-500 text-white text-[11px] font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-1.5 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors flex items-center justify-center gap-1.5"
               >
                 {deleting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-3 w-3" />
                 )}
                 {deleting ? "Deleting..." : "Delete"}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-2 bg-muted/20 text-muted-foreground text-[11px] font-medium hover:bg-muted/30 transition-colors"
+                className="flex-1 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-medium rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>

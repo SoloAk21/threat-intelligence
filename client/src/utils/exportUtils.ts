@@ -2,6 +2,24 @@
 import type { ThreatData } from "@/types/threat";
 import jsPDF from "jspdf";
 
+// Helper to load and convert image to base64
+const loadImageAsBase64 = async (src: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+};
+
 export function threatToJSON(data: ThreatData): string {
   return JSON.stringify(data, null, 2);
 }
@@ -27,7 +45,10 @@ export function threatToCSV(data: ThreatData): string {
   return [headers.join(","), values.join(",")].join("\n");
 }
 
-export async function threatToPDF(data: ThreatData): Promise<Blob> {
+export async function threatToPDF(
+  data: ThreatData,
+  bgImagePath?: string,
+): Promise<Blob> {
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -35,6 +56,19 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
     compress: true,
     putOnlyUsedFonts: true,
   });
+
+  // Load background image if provided
+  let bgImageBase64: string | null = null;
+  if (bgImagePath) {
+    try {
+      bgImageBase64 = await loadImageAsBase64(bgImagePath);
+    } catch (err) {
+      console.warn("Failed to load background image:", err);
+    }
+  }
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
 
   // Brand Colors
   const colors = {
@@ -49,8 +83,8 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
     highLight: "#ffedd5",
     medium: "#0cb7b7",
     mediumLight: "#f0fdfa",
-    low: "#2dc5c5",
-    lowLight: "#ecfdf5",
+    low: "#22c55e",
+    lowLight: "#f0fdf4",
     text: "#1e293b",
     textLight: "#64748b",
     textLighter: "#94a3b8",
@@ -64,38 +98,32 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
 
   let y = 20;
   const margin = 15;
-  const contentWidth = 180;
-  const pageHeight = 297;
+  const contentWidth = pageWidth - margin * 2;
+  const pageHeightMM = pageHeight;
+
+  const addBackground = () => {
+    if (bgImageBase64) {
+      try {
+        pdf.addImage(bgImageBase64, "PNG", 0, 0, pageWidth, pageHeightMM);
+      } catch (err) {
+        console.warn("Failed to add background image:", err);
+      }
+    }
+  };
 
   const addNewPage = () => {
     pdf.addPage();
+    addBackground();
     y = margin;
     addFooter(pdf.getNumberOfPages());
   };
 
-  const checkPageBreak = (needed: number) => {
-    if (y + needed > pageHeight - margin) {
+  const checkPageBreak = (needed: number): boolean => {
+    if (y + needed > pageHeightMM - margin) {
       addNewPage();
       return true;
     }
     return false;
-  };
-
-  const addText = (
-    text: string,
-    x: number,
-    fontSize: number,
-    options?: any,
-  ) => {
-    pdf.setFontSize(fontSize);
-    pdf.setFont(options?.font || "helvetica", options?.fontStyle || "normal");
-    pdf.setTextColor(options?.color || colors.text);
-    if (options?.align) {
-      pdf.text(text, x, y, { align: options.align });
-    } else {
-      pdf.text(text, x, y);
-    }
-    return pdf.getTextWidth(text);
   };
 
   const addLine = (
@@ -139,7 +167,6 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
     color: string,
   ) => {
     for (let i = 0; i < w; i++) {
-      const opacity = 1 - (i / w) * 0.5;
       pdf.setFillColor(color);
       pdf.rect(x + i, y, 1, h, "F");
     }
@@ -163,7 +190,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   };
 
   const addFooter = (pageNum: number) => {
-    const footerY = pageHeight - 10;
+    const footerY = pageHeightMM - 10;
     pdf.setFontSize(7);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(colors.textLighter);
@@ -208,6 +235,9 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
           ? colors.mediumLight
           : colors.lowLight;
 
+  // Add background to first page
+  addBackground();
+
   // ==================== COVER PAGE ====================
   const coverY = 70;
 
@@ -218,7 +248,6 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   pdf.setFontSize(48);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
-  pdf.text("TS", margin + contentWidth / 2, coverY - 15, { align: "center" });
 
   pdf.setFontSize(22);
   pdf.setFont("helvetica", "normal");
@@ -245,7 +274,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   );
 
   // Risk badge on cover
-  const badgeW = addBadge(
+  addBadge(
     riskLevel,
     margin + contentWidth / 2 - 20,
     coverY + 35,
@@ -262,7 +291,9 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
     `Report ID: ${data.analysisId || "N/A"}`,
     margin + contentWidth / 2,
     y,
-    { align: "center" },
+    {
+      align: "center",
+    },
   );
   y += 6;
   pdf.text(
@@ -287,15 +318,14 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   const circleX = margin + contentWidth / 2;
   const circleY = y + 25;
   const radius = 25;
-  const circumference = 2 * Math.PI * radius;
-  const dashArray = (riskScore / 100) * circumference;
 
   pdf.setDrawColor(colors.border);
   pdf.setLineWidth(3);
   pdf.circle(circleX, circleY, radius, "S");
   pdf.setDrawColor(riskColor);
   pdf.setLineWidth(3);
-  // Draw arc using lines for simplicity
+
+  // Draw arc
   for (let i = 0; i <= riskScore; i++) {
     const angle = (i / 100) * Math.PI * 2 - Math.PI / 2;
     const x = circleX + Math.cos(angle) * radius;
@@ -304,8 +334,6 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
       const prevAngle = ((i - 1) / 100) * Math.PI * 2 - Math.PI / 2;
       const prevX = circleX + Math.cos(prevAngle) * radius;
       const prevY = circleY + Math.sin(prevAngle) * radius;
-      pdf.setDrawColor(riskColor);
-      pdf.setLineWidth(3);
       pdf.line(prevX, prevY, x, yPoint);
     }
   }
@@ -421,7 +449,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("Threat Metrics Dashboard", margin, y);
-  y += 5;
+  y += 10;
   addGradientBar(margin, y, 80, 2, colors.primary);
   y += 12;
 
@@ -431,37 +459,31 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
       label: "AbuseIPDB",
       value: `${data.abuseipdb?.abuseConfidenceScore || 0}%`,
       sub: `${data.abuseipdb?.totalReports || 0} reports`,
-      icon: "⚠",
     },
     {
       label: "VirusTotal",
       value: `${data.vt?.last_analysis_stats?.malicious || 0}`,
       sub: "malicious detections",
-      icon: "🦠",
     },
     {
       label: "OTX Pulses",
       value: `${data.otx?.pulse_count || 0}`,
       sub: "threat pulses",
-      icon: "📡",
     },
     {
       label: "GreyNoise",
       value: data.greynoise?.classification || "unknown",
       sub: data.greynoise?.noise ? "active scanner" : "inactive",
-      icon: "🔊",
     },
     {
       label: "Multi-RBL",
       value: `${data.multirbl?.listedCount || 0}`,
       sub: `of ${data.multirbl?.totalChecked || 0} blacklists`,
-      icon: "📋",
     },
     {
       label: "Pulsedive",
       value: data.pulsedive?.risk || "none",
       sub: `score ${data.pulsedive?.score || 0}`,
-      icon: "⚡",
     },
   ];
 
@@ -492,7 +514,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
 
   y += 75;
 
-  // Progress bars for key metrics
+  // Progress bar for AbuseIPDB confidence
   if (data.abuseipdb?.abuseConfidenceScore) {
     checkPageBreak(20);
     pdf.setFontSize(10);
@@ -546,14 +568,20 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   addGradientBar(margin, y, 90, 2, colors.primary);
   y += 12;
 
-  // VirusTotal details
-  const vtStats = data.vt?.last_analysis_stats || {};
-  //   const totalDetections = (vtStats.malicious || 0) + (vtStats.suspicious || 0);
-  //   const totalEngines =
-  //     (vtStats.malicious || 0) +
-  //     (vtStats.suspicious || 0) +
-  //     (vtStats.harmless || 0) +
-  //     (vtStats.undetected || 0);
+  // VirusTotal details - Fixed TypeScript errors
+  const vtStats =
+    (data.vt?.last_analysis_stats as {
+      malicious?: number;
+      suspicious?: number;
+      harmless?: number;
+      undetected?: number;
+    }) || {};
+
+  const malicious = vtStats.malicious || 0;
+  const suspicious = vtStats.suspicious || 0;
+  const harmless = vtStats.harmless || 0;
+  const undetected = vtStats.undetected || 0;
+  const totalEngines = malicious + suspicious + harmless + undetected;
 
   pdf.setFontSize(11);
   pdf.setFont("helvetica", "bold");
@@ -563,27 +591,34 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   addLine(margin, y, margin + 50, y, colors.primary, 0.5);
   y += 8;
 
-  const vtData = [
-    ["Malicious", vtStats.malicious || 0, colors.critical],
-    ["Suspicious", vtStats.suspicious || 0, colors.high],
-    ["Harmless", vtStats.harmless || 0, colors.low],
-    ["Undetected", vtStats.undetected || 0, colors.textLight],
+  // Type-safe array with explicit typing
+  const vtData: Array<[string, number, string]> = [
+    ["Malicious", malicious, colors.critical],
+    ["Suspicious", suspicious, colors.high],
+    ["Harmless", harmless, colors.low],
+    ["Undetected", undetected, colors.textLight],
   ];
 
-  vtData.forEach(([label, value, color]) => {
+  vtData.forEach(([label, count, color]) => {
+    // Now count is guaranteed to be a number
     const percent =
-      totalEngines > 0 ? (value / totalEngines) * contentWidth : 0;
+      totalEngines > 0 ? (count / totalEngines) * contentWidth : 0;
+
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(colors.textLight);
-    pdf.text(label as string, margin, y);
+    pdf.text(label, margin, y);
+
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(color as string);
-    pdf.text(`${value}`, margin + 45, y);
+    pdf.setTextColor(color);
+    pdf.text(`${count}`, margin + 45, y);
     y += 3;
+
     addRect(margin, y, contentWidth, 3, colors.border, true);
-    addRect(margin, y, percent, 3, color as string, true);
+    if (percent > 0) {
+      addRect(margin, y, percent, 3, color, true);
+    }
     y += 6;
   });
 
@@ -620,35 +655,25 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   addLine(margin, y, margin + 60, y, colors.primary, 0.5);
   y += 8;
 
-  const abuseDetails = [
-    [
-      "Confidence Score",
-      `${data.abuseipdb?.abuseConfidenceScore || 0}%`,
-      data.abuseipdb?.abuseConfidenceScore || 0,
-    ],
-    ["Total Reports", `${data.abuseipdb?.totalReports || 0}`, null],
-    ["Distinct Reporters", `${data.abuseipdb?.numDistinctUsers || 0}`, null],
-    ["ISP", data.abuseipdb?.isp || "N/A", null],
-    ["Domain", data.abuseipdb?.domain || "N/A", null],
-    ["Usage Type", data.abuseipdb?.usageType || "N/A", null],
-    ["Country", data.abuseipdb?.countryName || "N/A", null],
+  const abuseDetails: Array<[string, string]> = [
+    ["Confidence Score", `${data.abuseipdb?.abuseConfidenceScore || 0}%`],
+    ["Total Reports", `${data.abuseipdb?.totalReports || 0}`],
+    ["Distinct Reporters", `${data.abuseipdb?.numDistinctUsers || 0}`],
+    ["ISP", data.abuseipdb?.isp || "N/A"],
+    ["Domain", data.abuseipdb?.domain || "N/A"],
+    ["Usage Type", data.abuseipdb?.usageType || "N/A"],
+    ["Country", data.abuseipdb?.countryName || "N/A"],
   ];
 
-  abuseDetails.forEach(([label, value, score]) => {
+  abuseDetails.forEach(([label, value]) => {
     checkPageBreak(6);
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.textLight);
-    pdf.text(label as string, margin, y);
+    pdf.text(label, margin, y);
     pdf.setFont("helvetica", "normal");
-    if (score !== null && (score as number) >= 75) {
-      pdf.setTextColor(colors.critical);
-    } else if (score !== null && (score as number) >= 50) {
-      pdf.setTextColor(colors.high);
-    } else {
-      pdf.setTextColor(colors.text);
-    }
-    pdf.text(value as string, margin + 50, y);
+    pdf.setTextColor(colors.text);
+    pdf.text(value, margin + 50, y);
     y += 6;
   });
 
@@ -679,192 +704,75 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   addGradientBar(margin, y, 80, 2, colors.primary);
   y += 12;
 
-  // Location card
-  addRect(margin, y, contentWidth, 50, colors.backgroundAlt, true);
-  addRect(margin, y, 4, 50, colors.primary, true);
+  // Location information
+  if (data.ipinfo?.country || data.abuseipdb?.countryName) {
+    addRect(margin, y, contentWidth, 45, colors.backgroundAlt, true);
+    addRect(margin, y, 4, 45, colors.primary, true);
 
-  pdf.setFontSize(10);
-  pdf.setFont("helvetica", "bold");
-  pdf.setTextColor(colors.primary);
-  pdf.text("Location Information", margin + 10, y + 6);
-
-  const locationData = [
-    ["Country", data.ipinfo?.country || data.abuseipdb?.countryName || "N/A"],
-    ["City", data.ipinfo?.city || "N/A"],
-    ["Region", data.ipinfo?.region || "N/A"],
-    ["Coordinates", data.ipinfo?.loc || "N/A"],
-    ["Timezone", data.ipinfo?.timezone || "N/A"],
-  ];
-
-  locationData.forEach(([label, value], i) => {
-    pdf.setFontSize(8);
+    pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(colors.textLight);
-    pdf.text(label as string, margin + 10, y + 16 + i * 6);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(colors.text);
-    pdf.text(value as string, margin + 35, y + 16 + i * 6);
-  });
+    pdf.setTextColor(colors.primary);
+    pdf.text("Location Information", margin + 10, y + 6);
 
-  // ISP and ASN
-  const networkData = [
-    [
-      "ISP / Organization",
-      data.ipinfo?.org_name || data.abuseipdb?.isp || "N/A",
-    ],
-    [
-      "ASN",
-      data.ipinfo?.asn
-        ? `AS${data.ipinfo.asn}`
-        : data.vt?.asn
-          ? `AS${data.vt.asn}`
-          : "N/A",
-    ],
-    ["AS Owner", data.vt?.as_owner || "N/A"],
-    ["Network Range", data.vt?.network || "N/A"],
-    ["Hostname", data.ipinfo?.hostname || "N/A"],
-    ["JARM Fingerprint", data.vt?.jarm || "N/A"],
-  ];
-
-  y += 65;
-  addRect(margin, y, contentWidth, 75, colors.backgroundAlt, true);
-  addRect(margin, y, 4, 75, colors.secondary, true);
-
-  pdf.setFontSize(10);
-  pdf.setFont("helvetica", "bold");
-  pdf.setTextColor(colors.secondary);
-  pdf.text("Network Information", margin + 10, y + 6);
-
-  networkData.forEach(([label, value], i) => {
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(colors.textLight);
-    pdf.text(label as string, margin + 10, y + 16 + i * 7);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(colors.text);
-    const truncatedValue =
-      (value as string).length > 40
-        ? (value as string).substring(0, 37) + "..."
-        : value;
-    pdf.text(truncatedValue as string, margin + 45, y + 16 + i * 7);
-  });
-
-  // ==================== PAGE 6 - SECURITY & PRIVACY ====================
-  addNewPage();
-
-  pdf.setFontSize(18);
-  pdf.setFont("helvetica", "bold");
-  pdf.setTextColor(colors.primary);
-  pdf.text("Security & Privacy Analysis", margin, y);
-  y += 5;
-  addGradientBar(margin, y, 85, 2, colors.primary);
-  y += 12;
-
-  const securityIndicators = [
-    {
-      label: "VPN Detection",
-      value: data.vpnapi?.security?.vpn || false,
-      color: colors.critical,
-    },
-    {
-      label: "Proxy Detection",
-      value: data.vpnapi?.security?.proxy || false,
-      color: colors.high,
-    },
-    {
-      label: "Tor Network",
-      value: data.vpnapi?.security?.tor || false,
-      color: colors.warning,
-    },
-    {
-      label: "Hosting Provider",
-      value: data.ipinfo?.privacy?.hosting || false,
-      color: colors.info,
-    },
-    {
-      label: "GreyNoise Scanner",
-      value: data.greynoise?.noise || false,
-      color: colors.high,
-    },
-    {
-      label: "RIOT Verified",
-      value: data.greynoise?.riot || false,
-      color: colors.success,
-    },
-  ];
-
-  securityIndicators.forEach((indicator, i) => {
-    const row = Math.floor(i / 2);
-    const col = i % 2;
-    const x = margin + col * 90;
-    const yPos = y + row * 25;
-
-    addRect(x, yPos, 88, 22, colors.backgroundAlt, true);
-    addRect(x, yPos, 88, 22, colors.border, false);
-
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(colors.textLight);
-    pdf.text(indicator.label, x + 5, yPos + 6);
-
-    const statusText = indicator.value ? "DETECTED" : "CLEAN";
-    const statusColor = indicator.value ? indicator.color : colors.success;
-
-    addBadge(statusText, x + 65, yPos + 2, statusColor, statusColor + "10");
-
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(indicator.value ? indicator.color : colors.success);
-    pdf.text(statusText, x + 70, yPos + 16);
-  });
-
-  y += 65;
-
-  // IPQS if available
-  if (data.ipqualityscore?.fraud_score !== undefined) {
-    checkPageBreak(40);
-    addRect(margin, y, contentWidth, 35, colors.backgroundAlt, true);
-    addRect(margin, y, 4, 35, colors.info, true);
-
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(colors.info);
-    pdf.text("IPQualityScore Analysis", margin + 10, y + 6);
-
-    const ipqsScore = data.ipqualityscore.fraud_score;
-    const ipqsColor =
-      ipqsScore >= 75
-        ? colors.critical
-        : ipqsScore >= 50
-          ? colors.high
-          : ipqsScore >= 25
-            ? colors.warning
-            : colors.success;
-
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(colors.textLight);
-    pdf.text("Fraud Score", margin + 10, y + 16);
-    pdf.setFontSize(14);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(ipqsColor);
-    pdf.text(`${ipqsScore}/100`, margin + 45, y + 15);
-
-    const ipqsDetails = [
-      `VPN: ${data.ipqualityscore.vpn ? "Yes" : "No"}`,
-      `Proxy: ${data.ipqualityscore.proxy ? "Yes" : "No"}`,
-      `Tor: ${data.ipqualityscore.tor ? "Yes" : "No"}`,
-      `Bot: ${data.ipqualityscore.bot_status ? "Yes" : "No"}`,
+    const locationItems: Array<[string, string]> = [
+      ["Country", data.ipinfo?.country || data.abuseipdb?.countryName || "N/A"],
+      ["City", data.ipinfo?.city || "N/A"],
+      ["Region", data.ipinfo?.region || "N/A"],
+      ["Timezone", data.ipinfo?.timezone || "N/A"],
     ];
 
-    pdf.setFontSize(7);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(colors.textLight);
-    pdf.text(ipqsDetails.join(" • "), margin + 10, y + 26);
-    y += 40;
+    locationItems.forEach(([label, value], idx) => {
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(colors.textLight);
+      pdf.text(label, margin + 10, y + 16 + idx * 7);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(colors.text);
+      pdf.text(value, margin + 40, y + 16 + idx * 7);
+    });
+
+    y += 55;
   }
 
-  // ==================== PAGE 7 - RECOMMENDATIONS ====================
+  // Network information
+  if (data.ipinfo?.org_name || data.vt?.as_owner) {
+    checkPageBreak(70);
+    addRect(margin, y, contentWidth, 60, colors.backgroundAlt, true);
+    addRect(margin, y, 4, 60, colors.secondary, true);
+
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(colors.secondary);
+    pdf.text("Network Information", margin + 10, y + 6);
+
+    const networkItems: Array<[string, string]> = [
+      ["ISP", data.ipinfo?.org_name || data.abuseipdb?.isp || "N/A"],
+      [
+        "ASN",
+        data.ipinfo?.asn
+          ? `AS${data.ipinfo.asn}`
+          : data.vt?.asn
+            ? `AS${data.vt.asn}`
+            : "N/A",
+      ],
+      ["AS Owner", data.vt?.as_owner || "N/A"],
+      ["Network Range", data.vt?.network || "N/A"],
+    ];
+
+    networkItems.forEach(([label, value], idx) => {
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(colors.textLight);
+      pdf.text(label, margin + 10, y + 18 + idx * 8);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(colors.text);
+      const truncatedValue =
+        value.length > 35 ? value.substring(0, 32) + "..." : value;
+      pdf.text(truncatedValue, margin + 40, y + 18 + idx * 8);
+    });
+  }
+
+  // ==================== PAGE 6 - RECOMMENDATIONS ====================
   addNewPage();
 
   pdf.setFontSize(18);
@@ -876,7 +784,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   y += 12;
 
   if (data.aiSummary?.recommendations?.length) {
-    data.aiSummary.recommendations.forEach((rec, i) => {
+    data.aiSummary.recommendations.forEach((rec) => {
       checkPageBreak(8);
       addRect(margin, y, 4, 6, colors.primary, true);
       pdf.setFontSize(9);
@@ -893,7 +801,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   // Tactical advice box
   if (data.aiSummary?.tacticalAdvice) {
     checkPageBreak(30);
-    addRect(margin, y, contentWidth, 28, colors.warning + "10", true);
+    addRect(margin, y, contentWidth, 28, colors.warning + "20", true);
     addRect(margin, y, 4, 28, colors.warning, true);
 
     pdf.setFontSize(9);
@@ -912,7 +820,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
     y += 32;
   }
 
-  // ==================== PAGE 8 - SOURCES & FOOTER ====================
+  // ==================== PAGE 7 - SOURCES ====================
   addNewPage();
 
   pdf.setFontSize(16);
@@ -931,12 +839,10 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
     "Pulsedive",
     "Multi-RBL",
     "IPinfo",
-    "InQuest RepDB",
     "ThreatFox",
     "IPQualityScore",
     "Shodan",
     "Censys",
-    "Talos",
     "URLScan.io",
     "URLHaus",
     "Sucuri",
@@ -946,7 +852,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
     const row = Math.floor(i / 4);
     const col = i % 4;
     const x = margin + col * 45;
-    const yPos = y + row * 10;
+    const yPos = y + row * 9;
 
     pdf.setFontSize(7);
     pdf.setFont("helvetica", "normal");
@@ -955,7 +861,7 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
     pdf.text(source, x + 3, yPos);
   });
 
-  y += 60;
+  y += 50;
 
   // AI model info
   if (data.aiSummaryMeta?.model) {
@@ -988,7 +894,6 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
       ] || colors.primary,
     );
     pdf.text(data.aiSummary.confidenceLevel, margin + 40, y);
-    y += 10;
   }
 
   // Final footer on all pages
@@ -999,4 +904,27 @@ export async function threatToPDF(data: ThreatData): Promise<Blob> {
   }
 
   return pdf.output("blob");
+}
+
+// Export function with download trigger
+export async function downloadPDF(
+  data: ThreatData,
+  filename?: string,
+  bgImagePath?: string,
+) {
+  try {
+    const blob = await threatToPDF(data, bgImagePath);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename || `threat-report-${data.input}-${Date.now()}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return true;
+  } catch (error) {
+    console.error("PDF generation failed:", error);
+    throw error;
+  }
 }

@@ -146,24 +146,11 @@ export function UnifiedAnalysisPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 px-3 py-3 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center flex-1 justify-center gap-3">
-          <div>
-            <h1 className="text-2xl sm:text-4xl  font-bold text-foreground  tracking-wide">
-              Cyber Threat Intelligence
-            </h1>
-            <p className="text-[10px] text-center text-muted-foreground">
-              25+ Sources • IP • URL • Domain • Hash • Email
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className="bg-card border-l-2 border-primary/60">
         <div className="px-3 py-2 border-b border-border/20 flex items-center gap-2 bg-muted/5">
           <div className="flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 text-primary/70" />
-            <span className="text-[11px] font-semibold tracking-tight text-foreground/80 uppercase">
+            <span className="text-sm  font-semibold tracking-tight text-foreground/80 uppercase">
               Threat Analysis
             </span>
           </div>
@@ -190,7 +177,7 @@ export function UnifiedAnalysisPage() {
                 },
               })}
               placeholder={getPlaceholder()}
-              className="w-full bg-background/50 border border-border/30 pl-3 pr-24 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/40"
+              className="w-full bg-background/50 border border-border pl-3 pr-24 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/40"
               autoComplete="off"
               spellCheck="false"
             />

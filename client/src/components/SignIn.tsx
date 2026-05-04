@@ -1,4 +1,4 @@
-// src/components/SignIn.tsx
+// src/components/SignIn.tsx (updated)
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "../store/authStore";
@@ -6,15 +6,17 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Mail, Lock, AlertCircle, ShieldCheck, LogIn } from "lucide-react";
+import { Mail, Lock, AlertCircle, LogIn } from "lucide-react";
 
 interface SignInProps {
   onSwitchToSignUp: () => void;
+  onSwitchToForgotPassword: () => void;
   onSuccess?: () => void;
 }
 
 export const SignIn: React.FC<SignInProps> = ({
   onSwitchToSignUp,
+  onSwitchToForgotPassword,
   onSuccess,
 }) => {
   const [email, setEmail] = useState("");
@@ -32,7 +34,16 @@ export const SignIn: React.FC<SignInProps> = ({
       await login(email, password);
       onSuccess?.();
     } catch (err: any) {
-      setError(err.message || "Login failed. Please check your credentials.");
+      // Enhanced error handling
+      if (err.message?.includes("email")) {
+        setError("No account found with this email address");
+      } else if (err.message?.includes("password")) {
+        setError("Incorrect password. Please try again");
+      } else if (err.message?.includes("verify")) {
+        setError("Please verify your email address before signing in");
+      } else {
+        setError(err.message || "Login failed. Please check your credentials.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +106,17 @@ export const SignIn: React.FC<SignInProps> = ({
               className="pl-9 bg-background/50 border-border/30 focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/20 text-sm"
               required
             />
+          </div>
+
+          {/* Forgot Password Link */}
+          <div className="flex justify-end mt-1">
+            <button
+              type="button"
+              onClick={onSwitchToForgotPassword}
+              className="text-[10px] text-brand-primary hover:text-brand-primary/80 transition-colors"
+            >
+              Forgot password?
+            </button>
           </div>
         </div>
 
