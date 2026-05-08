@@ -29,6 +29,7 @@ import type { ThreatData } from "@/types/threat";
 
 export function UnifiedAnalysisPage() {
   const [result, setResult] = useState<ThreatData | null>(null);
+  const [tempId, setTempId] = useState<string | null>(null);
   const [detectedType, setDetectedType] = useState<
     "ip" | "url" | "domain" | "hash" | "email" | "unknown" | ""
   >("");
@@ -58,11 +59,23 @@ export function UnifiedAnalysisPage() {
   const mutation = useMutation({
     mutationFn: (input: string) => analyzeInput(input),
     onSuccess: (response) => {
-      if (response?.data && response.data.input) {
-        setResult(response.data);
-        addToHistory(response.data);
+      if (response?.success && response.data) {
+        // Store the temporary ID and transform the data for display
+        setTempId(response.tempId);
+
+        // Add analysisId to the data for reference
+        const analysisData: ThreatData = {
+          ...response.data,
+          analysisId: response.tempId,
+          inputType: response.data.type as any,
+        };
+
+        setResult(analysisData);
+        addToHistory(analysisData);
+
         toast.success("Analysis complete", {
-          description: `${response.data.riskLevel} risk detected`,
+          description:
+            response.message || `${analysisData.riskLevel} risk detected`,
         });
       } else {
         toast.error("Received invalid data from server");
@@ -76,6 +89,9 @@ export function UnifiedAnalysisPage() {
   const onSubmit = useCallback(
     (data: { input: string }) => {
       if (!data.input?.trim()) return;
+      // Clear previous result when new analysis starts
+      setResult(null);
+      setTempId(null);
       mutation.mutate(data.input.trim());
     },
     [mutation],
@@ -83,6 +99,8 @@ export function UnifiedAnalysisPage() {
 
   const reanalyze = (input: string) => {
     setValue("input", input);
+    setResult(null);
+    setTempId(null);
     mutation.mutate(input);
   };
 
@@ -150,7 +168,7 @@ export function UnifiedAnalysisPage() {
         <div className="px-3 py-2 border-b border-border/20 flex items-center gap-2 bg-muted/5">
           <div className="flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 text-primary/70" />
-            <span className="text-sm  font-semibold tracking-tight text-foreground/80 uppercase">
+            <span className="text-sm font-semibold tracking-tight text-foreground/80 uppercase">
               Threat Analysis
             </span>
           </div>
@@ -297,6 +315,7 @@ export function UnifiedAnalysisPage() {
       )}
 
       {mutation.isPending && <ResultSkeleton />}
+
       {result && !mutation.isPending && <AnalysisResults data={result} />}
 
       {!result && !mutation.isPending && history.length === 0 && (

@@ -51,7 +51,6 @@ export const useAuthStore = create<AuthState>()(
 
           if (!response.ok) {
             const error = await response.json();
-            // Enhanced error messages based on status code
             if (response.status === 401) {
               throw new Error("Invalid email or password");
             } else if (response.status === 403) {
@@ -68,7 +67,6 @@ export const useAuthStore = create<AuthState>()(
 
           const data = await response.json();
 
-          // Validate response data
           if (!data.token || !data.user) {
             throw new Error("Invalid response from server");
           }
@@ -89,7 +87,6 @@ export const useAuthStore = create<AuthState>()(
       signup: async (username: string, email: string, password: string) => {
         set({ isLoading: true });
         try {
-          // Validate inputs before sending
           if (!username || username.length < 3) {
             throw new Error("Username must be at least 3 characters");
           }
@@ -108,7 +105,6 @@ export const useAuthStore = create<AuthState>()(
 
           if (!response.ok) {
             const error = await response.json();
-            // Enhanced error messages
             if (response.status === 409) {
               if (error.field === "email") {
                 throw new Error(
@@ -189,7 +185,6 @@ export const useAuthStore = create<AuthState>()(
         const { token } = get();
         if (!token) throw new Error("Not authenticated");
 
-        // Validate new password
         if (newPassword.length < 6) {
           throw new Error("New password must be at least 6 characters");
         }
@@ -228,7 +223,6 @@ export const useAuthStore = create<AuthState>()(
       forgotPassword: async (email: string) => {
         set({ isLoading: true });
         try {
-          // Validate email
           if (!email || !email.includes("@")) {
             throw new Error("Please enter a valid email address");
           }
@@ -241,9 +235,7 @@ export const useAuthStore = create<AuthState>()(
 
           if (!response.ok) {
             const error = await response.json();
-            // Don't reveal if email exists for security
             if (response.status === 404) {
-              // Still return success to prevent email enumeration
               return;
             }
             throw new Error(error.message || "Failed to send reset email");
@@ -259,7 +251,6 @@ export const useAuthStore = create<AuthState>()(
       resetPassword: async (token: string, newPassword: string) => {
         set({ isLoading: true });
         try {
-          // Validate new password
           if (!newPassword || newPassword.length < 6) {
             throw new Error("Password must be at least 6 characters");
           }
@@ -323,7 +314,6 @@ export const useAuthStore = create<AuthState>()(
             const data = await response.json();
             set({ user: data.user, isAuthenticated: true });
           } else {
-            // Token expired or invalid
             set({ user: null, token: null, isAuthenticated: false });
             localStorage.removeItem("auth-storage");
           }
@@ -340,3 +330,20 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+// Export helper functions for easy access outside React components
+export const getToken = (): string | null => {
+  return useAuthStore.getState().token;
+};
+
+export const getUser = (): User | null => {
+  return useAuthStore.getState().user;
+};
+
+export const isAuthenticated = (): boolean => {
+  return useAuthStore.getState().isAuthenticated;
+};
+
+export const logout = (): void => {
+  useAuthStore.getState().logout();
+};

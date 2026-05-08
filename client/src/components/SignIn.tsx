@@ -107,17 +107,6 @@ export const SignIn: React.FC<SignInProps> = ({
               required
             />
           </div>
-
-          {/* Forgot Password Link */}
-          <div className="flex justify-end mt-1">
-            <button
-              type="button"
-              onClick={onSwitchToForgotPassword}
-              className="text-[10px] text-brand-primary hover:text-brand-primary/80 transition-colors"
-            >
-              Forgot password?
-            </button>
-          </div>
         </div>
 
         <Button

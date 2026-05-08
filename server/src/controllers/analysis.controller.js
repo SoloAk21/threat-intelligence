@@ -1,15 +1,32 @@
-// src/controllers/analysis.controller.js
 const threatService = require("../services/threat.service");
 const { detectInputType } = require("../utils/inputDetector");
 const { generateThreatSummaryAndRisk } = require("../services/gemini.service");
 const Analysis = require("../models/Analysis");
 const apiKeyManager = require("../services/apiKeyManager");
+const mongoose = require("mongoose");
+
+// In-memory cache for temporary analyses (expires after 1 hour)
+const temporaryAnalyses = new Map();
+
+// Clean up expired temporary analyses every 30 minutes
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [id, data] of temporaryAnalyses.entries()) {
+      if (data.expiresAt < now) {
+        temporaryAnalyses.delete(id);
+        console.log(`[TempCache] Cleaned up expired analysis: ${id}`);
+      }
+    }
+  },
+  30 * 60 * 1000,
+);
 
 const analyze = async (req, res, next) => {
   const startTime = Date.now();
 
   try {
-    const { input, type: forcedType, skipCache = false } = req.body;
+    const { input, type: forcedType } = req.body;
     const userId = req.userId;
 
     if (!input?.trim()) {
@@ -21,58 +38,76 @@ const analyze = async (req, res, next) => {
     const trimmedInput = input.trim();
     const analysisType = forcedType || detectInputType(trimmedInput);
 
-    if (!skipCache) {
-      const cachedAnalysis = await Analysis.findRecent(
-        trimmedInput,
-        analysisType,
-        24,
-      );
-      if (cachedAnalysis) {
-        console.log(`[Cache] Returning cached analysis for ${trimmedInput}`);
+    console.log(
+      `[Analysis] Checking for ${trimmedInput} (${analysisType}) in saved database first...`,
+    );
 
-        // Return FULL data from cached analysis
-        return res.json({
-          success: true,
-          fromCache: true,
-          cachedAt: cachedAnalysis.createdAt,
-          data: {
-            type: cachedAnalysis.inputType,
-            input: cachedAnalysis.input,
-            riskScore: cachedAnalysis.riskScore,
-            riskLevel: cachedAnalysis.riskLevel,
-            aiSummary: cachedAnalysis.aiSummary,
-            aiSummaryMeta: cachedAnalysis.aiSummaryMeta,
-            analysisId: cachedAnalysis._id,
-            timestamp: cachedAnalysis.createdAt,
-            analysisDuration: cachedAnalysis.analysisDuration,
-            // Full service responses
-            vt: cachedAnalysis.serviceResponses?.vt,
-            abuseipdb: cachedAnalysis.serviceResponses?.abuseipdb,
-            otx: cachedAnalysis.serviceResponses?.otx,
-            threatfox: cachedAnalysis.serviceResponses?.threatfox,
-            pulsedive: cachedAnalysis.serviceResponses?.pulsedive,
-            greynoise: cachedAnalysis.serviceResponses?.greynoise,
-            ipqualityscore: cachedAnalysis.serviceResponses?.ipqualityscore,
-            vpnapi: cachedAnalysis.serviceResponses?.vpnapi,
-            shodan: cachedAnalysis.serviceResponses?.shodan,
-            censys: cachedAnalysis.serviceResponses?.censys,
-            ipinfo: cachedAnalysis.serviceResponses?.ipinfo,
-            talos: cachedAnalysis.serviceResponses?.talos,
-            multirbl: cachedAnalysis.serviceResponses?.multirbl,
-            inquest: cachedAnalysis.serviceResponses?.inquest,
-            threatminer: cachedAnalysis.serviceResponses?.threatminer,
-            malwareurl: cachedAnalysis.serviceResponses?.malwareurl,
-            iocone: cachedAnalysis.serviceResponses?.iocone,
-            ipify: cachedAnalysis.serviceResponses?.ipify,
-            ipteoh: cachedAnalysis.serviceResponses?.ipteoh,
-            urlscan: cachedAnalysis.serviceResponses?.urlscan,
-            urlhaus: cachedAnalysis.serviceResponses?.urlhaus,
-            sucuri: cachedAnalysis.serviceResponses?.sucuri,
-          },
-        });
-      }
+    // STEP 1: Check saved database for existing analysis
+    const existingAnalysis = await Analysis.findOne({
+      userId,
+      input: trimmedInput,
+      inputType: analysisType,
+      saved: true, // Only check saved analyses
+    }).sort({ createdAt: -1 }); // Get the most recent one if multiple exist
+
+    // STEP 2: If found in database, return it directly (fast path)
+    if (existingAnalysis) {
+      console.log(
+        `[Analysis] Found saved analysis in database for ${trimmedInput} - returning cached result (ID: ${existingAnalysis._id})`,
+      );
+
+      // Update the analysis duration to show it was cached
+      const cachedDuration = Date.now() - startTime;
+
+      return res.json({
+        success: true,
+        cached: true,
+        message: "Retrieved from saved analyses (fast cache hit)",
+        data: {
+          _id: existingAnalysis._id,
+          type: existingAnalysis.inputType,
+          input: existingAnalysis.input,
+          riskScore: existingAnalysis.riskScore,
+          riskLevel: existingAnalysis.riskLevel,
+          aiSummary: existingAnalysis.aiSummary,
+          aiSummaryMeta: existingAnalysis.aiSummaryMeta,
+          timestamp: existingAnalysis.createdAt,
+          analysisDuration: cachedDuration,
+          savedAt: existingAnalysis.savedAt,
+          notes: existingAnalysis.notes,
+          tags: existingAnalysis.tags,
+          starred: existingAnalysis.starred,
+          vt: existingAnalysis.serviceResponses?.vt,
+          abuseipdb: existingAnalysis.serviceResponses?.abuseipdb,
+          otx: existingAnalysis.serviceResponses?.otx,
+          threatfox: existingAnalysis.serviceResponses?.threatfox,
+          pulsedive: existingAnalysis.serviceResponses?.pulsedive,
+          greynoise: existingAnalysis.serviceResponses?.greynoise,
+          ipqualityscore: existingAnalysis.serviceResponses?.ipqualityscore,
+          vpnapi: existingAnalysis.serviceResponses?.vpnapi,
+          shodan: existingAnalysis.serviceResponses?.shodan,
+          censys: existingAnalysis.serviceResponses?.censys,
+          ipinfo: existingAnalysis.serviceResponses?.ipinfo,
+          talos: existingAnalysis.serviceResponses?.talos,
+          multirbl: existingAnalysis.serviceResponses?.multirbl,
+          inquest: existingAnalysis.serviceResponses?.inquest,
+          threatminer: existingAnalysis.serviceResponses?.threatminer,
+          ipteoh: existingAnalysis.serviceResponses?.ipteoh,
+          ipify: existingAnalysis.serviceResponses?.ipify,
+          malwareurl: existingAnalysis.serviceResponses?.malwareurl,
+          iocone: existingAnalysis.serviceResponses?.iocone,
+          urlscan: existingAnalysis.serviceResponses?.urlscan,
+          urlhaus: existingAnalysis.serviceResponses?.urlhaus,
+          sucuri: existingAnalysis.serviceResponses?.sucuri,
+        },
+      });
     }
 
+    console.log(
+      `[Analysis] No saved analysis found - performing fresh external analysis for ${trimmedInput}`,
+    );
+
+    // STEP 3: If not found, proceed with external API calls (original logic)
     // Initialize variables
     let vt,
       abuseipdb,
@@ -288,7 +323,11 @@ const analyze = async (req, res, next) => {
       aiSummaryMeta = { error: summaryErr.message, fallbackUsed: true };
     }
 
+    // Create temporary ID for frontend reference
+    const tempId = new mongoose.Types.ObjectId().toString();
+
     const analysisData = {
+      _id: tempId,
       userId,
       input: trimmedInput,
       inputType: analysisType,
@@ -323,22 +362,43 @@ const analyze = async (req, res, next) => {
       analysisDuration: Date.now() - startTime,
       clientIp: req.ip,
       userAgent: req.get("user-agent"),
+      saved: false,
+      savedAt: null,
+      notes: "",
+      tags: [],
+      starred: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
-    const analysis = new Analysis(analysisData);
-    analysis.compressResponses();
-    await analysis.save();
+    // Store in temporary memory cache (expires in 1 hour)
+    temporaryAnalyses.set(tempId, {
+      ...analysisData,
+      expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour TTL
+    });
 
+    console.log(
+      `[Analysis] Temporary analysis stored with ID: ${tempId} (expires in 1 hour)`,
+    );
+
+    // Return analysis result WITHOUT saving to database
     return res.json({
       success: true,
+      cached: false,
+      temporary: true,
+      tempId: tempId,
+      message:
+        "Analysis complete. Click save to permanently store this analysis.",
       data: {
+        _id: tempId,
         type: analysisType,
         input: trimmedInput,
         riskScore,
         riskLevel,
+        aiSummary,
+        aiSummaryMeta,
         timestamp: new Date().toISOString(),
         analysisDuration: analysisData.analysisDuration,
-        analysisId: analysis._id,
         vt,
         abuseipdb,
         otx,
@@ -361,8 +421,6 @@ const analyze = async (req, res, next) => {
         urlscan,
         urlhaus,
         sucuri,
-        aiSummary,
-        aiSummaryMeta,
       },
     });
   } catch (err) {
@@ -370,68 +428,82 @@ const analyze = async (req, res, next) => {
     next(err);
   }
 };
-
-const calculateFallbackRisk = (data) => {
-  let riskScore = 0;
-  let factors = 0;
-
-  if (data.vt?.last_analysis_stats?.malicious) {
-    riskScore += Math.min(40, data.vt.last_analysis_stats.malicious * 8);
-    factors++;
-  }
-
-  if (data.abuseipdb?.abuseConfidenceScore) {
-    riskScore += data.abuseipdb.abuseConfidenceScore * 0.4;
-    factors++;
-  }
-
-  if (data.greynoise?.classification === "malicious") {
-    riskScore += 35;
-    factors++;
-  } else if (data.greynoise?.classification === "benign") {
-    riskScore += 5;
-    factors++;
-  }
-
-  if (data.ipqualityscore?.fraud_score) {
-    riskScore += data.ipqualityscore.fraud_score * 0.35;
-    factors++;
-  }
-
-  return factors > 0
-    ? Math.min(100, Math.round((riskScore / factors) * 1.5))
-    : 0;
-};
-
 const saveAnalysis = async (req, res) => {
   try {
-    const { analysisId, notes, tags } = req.body;
+    const { tempId, notes, tags } = req.body;
     const userId = req.userId;
 
-    if (!analysisId) {
+    if (!tempId) {
       return res
         .status(400)
-        .json({ success: false, error: "Analysis ID required" });
+        .json({ success: false, error: "Temporary analysis ID required" });
     }
 
-    const analysis = await Analysis.findOne({ _id: analysisId, userId });
-    if (!analysis) {
+    // Get from temporary storage
+    const tempData = temporaryAnalyses.get(tempId);
+
+    if (!tempData) {
+      return res.status(404).json({
+        success: false,
+        error: "Analysis expired or not found. Please re-run the analysis.",
+      });
+    }
+
+    // Check if this user owns the temporary analysis
+    if (tempData.userId.toString() !== userId) {
       return res
-        .status(404)
-        .json({ success: false, error: "Analysis not found" });
+        .status(403)
+        .json({ success: false, error: "Unauthorized to save this analysis" });
     }
 
-    analysis.saved = !analysis.saved;
-    analysis.savedAt = analysis.saved ? new Date() : null;
-    if (notes !== undefined) analysis.notes = notes;
-    if (tags !== undefined) analysis.tags = tags;
+    // Check if already saved
+    const existingSaved = await Analysis.findOne({
+      userId,
+      input: tempData.input,
+      inputType: tempData.inputType,
+      saved: true,
+    });
+
+    if (existingSaved) {
+      return res.status(409).json({
+        success: false,
+        error:
+          "An analysis with this input already exists in your saved analyses",
+        existingId: existingSaved._id,
+      });
+    }
+
+    // Create new database document
+    const analysis = new Analysis({
+      userId: tempData.userId,
+      input: tempData.input,
+      inputType: tempData.inputType,
+      riskScore: tempData.riskScore,
+      riskLevel: tempData.riskLevel,
+      aiSummary: tempData.aiSummary,
+      aiSummaryMeta: tempData.aiSummaryMeta,
+      serviceResponses: tempData.serviceResponses,
+      analysisDuration: tempData.analysisDuration,
+      clientIp: tempData.clientIp,
+      userAgent: tempData.userAgent,
+      saved: true,
+      savedAt: new Date(),
+      notes: notes || tempData.notes || "",
+      tags: tags || tempData.tags || [],
+      starred: false,
+    });
 
     await analysis.save();
+
+    // Remove from temporary storage
+    temporaryAnalyses.delete(tempId);
+
+    console.log(`[Analysis] Saved permanently with ID: ${analysis._id}`);
 
     res.json({
       success: true,
       data: analysis,
-      message: analysis.saved ? "Analysis saved" : "Analysis unsaved",
+      message: "Analysis saved successfully",
     });
   } catch (err) {
     console.error("Save analysis error:", err);
@@ -439,6 +511,7 @@ const saveAnalysis = async (req, res) => {
   }
 };
 
+// In your getSavedAnalyses controller
 const getSavedAnalyses = async (req, res) => {
   try {
     const userId = req.userId;
@@ -457,9 +530,25 @@ const getSavedAnalyses = async (req, res) => {
       Analysis.countDocuments(query),
     ]);
 
+    // Transform data to include all needed fields
+    const transformedData = saved.map((analysis) => {
+      const obj = analysis.toObject();
+      return {
+        ...obj,
+        analysisId: obj._id.toString(), // Add analysisId field
+        saved: true, // Ensure saved flag is true
+        _id: obj._id.toString(), // Keep _id as string
+      };
+    });
+
     res.json({
       success: true,
-      data: { saved, total, limit: parseInt(limit), offset: parseInt(offset) },
+      data: {
+        saved: transformedData,
+        total,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      },
     });
   } catch (err) {
     console.error("Get saved analyses error:", err);
@@ -472,6 +561,27 @@ const deleteSavedAnalysis = async (req, res) => {
     const { id } = req.params;
     const userId = req.userId;
 
+    // Option 1: Hard delete (actually remove from database)
+    const analysis = await Analysis.findOneAndDelete({
+      _id: id,
+      userId,
+      saved: true,
+    });
+
+    if (!analysis) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Saved analysis not found" });
+    }
+
+    console.log(`[Analysis] Permanently deleted saved analysis: ${id}`);
+
+    res.json({
+      success: true,
+      message: "Analysis permanently deleted from saved analyses",
+    });
+
+    /* Option 2: Soft delete (just mark as not saved) - use this if you want to keep data
     const analysis = await Analysis.findOne({ _id: id, userId, saved: true });
     if (!analysis) {
       return res
@@ -484,11 +594,12 @@ const deleteSavedAnalysis = async (req, res) => {
     await analysis.save();
 
     res.json({ success: true, message: "Removed from saved analyses" });
+    */
   } catch (err) {
+    console.error("Delete saved analysis error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
 const toggleStarred = async (req, res) => {
   try {
     const { id } = req.params;
@@ -603,7 +714,17 @@ const getAnalysisById = async (req, res) => {
     const { id } = req.params;
     const userId = req.userId;
 
-    const analysis = await Analysis.findOne({ _id: id, userId });
+    // First check database
+    let analysis = await Analysis.findOne({ _id: id, userId });
+
+    // If not in database, check temporary storage
+    if (!analysis && temporaryAnalyses.has(id)) {
+      const tempData = temporaryAnalyses.get(id);
+      if (tempData.userId.toString() === userId) {
+        analysis = tempData;
+      }
+    }
+
     if (!analysis) {
       return res
         .status(404)
@@ -757,18 +878,50 @@ const rotateAPIKeys = async (req, res) => {
   }
 };
 
+const calculateFallbackRisk = (data) => {
+  let riskScore = 0;
+  let factors = 0;
+
+  if (data.vt?.last_analysis_stats?.malicious) {
+    riskScore += Math.min(40, data.vt.last_analysis_stats.malicious * 8);
+    factors++;
+  }
+
+  if (data.abuseipdb?.abuseConfidenceScore) {
+    riskScore += data.abuseipdb.abuseConfidenceScore * 0.4;
+    factors++;
+  }
+
+  if (data.greynoise?.classification === "malicious") {
+    riskScore += 35;
+    factors++;
+  } else if (data.greynoise?.classification === "benign") {
+    riskScore += 5;
+    factors++;
+  }
+
+  if (data.ipqualityscore?.fraud_score) {
+    riskScore += data.ipqualityscore.fraud_score * 0.35;
+    factors++;
+  }
+
+  return factors > 0
+    ? Math.min(100, Math.round((riskScore / factors) * 1.5))
+    : 0;
+};
+
 module.exports = {
   analyze,
-  getAnalysisHistory,
-  getAnalysisById,
-  deleteAnalysis,
-  getStatistics,
-  getAPIKeyStatus,
-  rotateAPIKeys,
   saveAnalysis,
   getSavedAnalyses,
   deleteSavedAnalysis,
   toggleStarred,
   updateSavedAnalysis,
   checkSavedStatus,
+  getAnalysisHistory,
+  getAnalysisById,
+  deleteAnalysis,
+  getStatistics,
+  getAPIKeyStatus,
+  rotateAPIKeys,
 };

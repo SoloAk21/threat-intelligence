@@ -1,4 +1,3 @@
-// src/components/ThreatSummaryCard.tsx
 import { useState, useRef, useEffect } from "react";
 import {
   Shield,
@@ -25,19 +24,21 @@ import {
   TrendingDown,
   Brain,
   Network,
+  Clock,
 } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 import type { ThreatData, GreyNoiseData } from "@/types/threat";
-import { api } from "@/lib/api";
+
 import { toast } from "sonner";
 import { downloadPDF, threatToCSV, threatToJSON } from "@/utils/exportUtils";
+import api from "@/lib/api";
 
 interface ThreatSummaryCardProps {
   data: ThreatData;
   showActions?: boolean;
   onExport?: (format: "json" | "csv" | "pdf") => void;
   onCopy?: () => void;
-  onSave?: () => void;
+  onSave?: (notes?: string, tags?: string[]) => Promise<boolean>;
   savedAnalysisId?: string;
   isSaved?: boolean;
 }
@@ -192,18 +193,24 @@ export function ThreatSummaryCard({
   savedAnalysisId,
   isSaved: externalIsSaved,
 }: ThreatSummaryCardProps) {
+  // FIX: Get analysis ID from either analysisId or _id field with type assertion
+  const analysisId = data.analysisId || (data as any)._id;
+
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isSaved, setIsSaved] = useState(externalIsSaved || false);
+  // FIX: Check data.saved property as well
+  const [isSaved, setIsSaved] = useState(
+    externalIsSaved || (data as any).saved || false,
+  );
   const [saveNotes, setSaveNotes] = useState("");
   const [saveTags, setSaveTags] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [existingSavedId, setExistingSavedId] = useState(
-    savedAnalysisId || null,
+    savedAnalysisId || ((data as any).saved ? analysisId : null),
   );
 
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -240,6 +247,9 @@ export function ThreatSummaryCard({
   const ipqsError = data.ipqualityscore?.raw?.success === false;
   const ipqsMessage = data.ipqualityscore?.raw?.message || "";
 
+  // Check if this is a temporary analysis (not saved)
+  const isTemporary = analysisId && !isSaved && !existingSavedId;
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -259,24 +269,31 @@ export function ThreatSummaryCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // FIX: Check saved status using analysisId
   useEffect(() => {
     const checkSavedStatus = async () => {
-      if (!data.analysisId) return;
+      if (!analysisId) return;
+
+      // If already marked as saved from props/data, no need to check
+      if (externalIsSaved || data.saved) {
+        setIsSaved(true);
+        setExistingSavedId(analysisId);
+        return;
+      }
+
       try {
-        const response = await api.get(`/saved/check/${data.analysisId}`);
+        const response = await api.get(`/saved/check/${analysisId}`);
         if (response.data.saved) {
           setIsSaved(true);
           setExistingSavedId(response.data.id);
         }
-      } catch (err) {}
+      } catch (err) {
+        // Ignore errors for temporary analyses
+      }
     };
-    if (externalIsSaved === undefined) {
-      checkSavedStatus();
-    } else {
-      setIsSaved(externalIsSaved);
-      setExistingSavedId(savedAnalysisId || null);
-    }
-  }, [data.analysisId, externalIsSaved, savedAnalysisId]);
+
+    checkSavedStatus();
+  }, [analysisId, externalIsSaved, data.saved]);
 
   const handleCopy = () => {
     const summary = data.aiSummary?.executiveSummary || "No summary available";
@@ -312,7 +329,6 @@ export function ThreatSummaryCard({
         URL.revokeObjectURL(url);
         toast.success("CSV report downloaded");
       } else if (format === "pdf") {
-        // Use background image from public folder
         const bgImagePath = "/images/pdf-bg.png";
         await downloadPDF(data, `threat-report-${data.input}.pdf`, bgImagePath);
         toast.success("PDF report generated");
@@ -324,34 +340,54 @@ export function ThreatSummaryCard({
     }
   };
 
+  // FIX: Use analysisId instead of data.analysisId
   const handleSaveConfirm = async () => {
-    if (!data.analysisId) {
-      toast.error("Cannot save: No analysis ID");
+    if (!analysisId) {
+      toast.error("Cannot save: No analysis ID found");
       return;
     }
 
     setSaving(true);
     try {
       if (onSave) {
-        await onSave();
+        const success = await onSave(
+          saveNotes,
+          saveTags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean),
+        );
+        if (success) {
+          setIsSaved(true);
+          setShowSaveModal(false);
+          toast.success("Analysis saved to your collection");
+        }
       } else {
+        // Direct API call with tempId
         const response = await api.post("/save", {
-          analysisId: data.analysisId,
+          tempId: analysisId,
           notes: saveNotes,
           tags: saveTags
             .split(",")
             .map((t) => t.trim())
             .filter(Boolean),
         });
+
         if (response.data.success) {
-          setIsSaved(response.data.data.saved);
+          setIsSaved(true);
           setExistingSavedId(response.data.data._id);
-          toast.success(response.data.message);
+          toast.success(response.data.message || "Analysis saved successfully");
+          setShowSaveModal(false);
         }
       }
-      setShowSaveModal(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to save");
+      if (err.response?.status === 409) {
+        toast.error("This analysis is already saved");
+      } else if (err.response?.status === 404) {
+        toast.error("Analysis expired. Please re-run the analysis.");
+      } else {
+        toast.error(err.response?.data?.error || "Failed to save analysis");
+      }
     } finally {
       setSaving(false);
     }
@@ -362,17 +398,11 @@ export function ThreatSummaryCard({
 
     setDeleting(true);
     try {
-      const response = await api.post("/save", {
-        analysisId: data.analysisId,
-        notes: "",
-        tags: [],
-      });
-      if (response.data.success && !response.data.data.saved) {
-        setIsSaved(false);
-        setExistingSavedId(null);
-        setShowDeleteConfirm(false);
-        toast.success("Removed from saved");
-      }
+      await api.delete(`/saved/${existingSavedId}`);
+      setIsSaved(false);
+      setExistingSavedId(null);
+      setShowDeleteConfirm(false);
+      toast.success("Removed from saved analyses");
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Failed to remove");
     } finally {
@@ -413,6 +443,18 @@ export function ThreatSummaryCard({
                   {riskCalculatedByAI && (
                     <span className="inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300 rounded font-mono">
                       <Zap className="h-2 w-2" /> AI Scored
+                    </span>
+                  )}
+                  {isTemporary && (
+                    <span className="inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 rounded font-mono">
+                      <Clock className="h-2 w-2" />
+                      Temporary
+                    </span>
+                  )}
+                  {!isTemporary && isSaved && (
+                    <span className="inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 rounded font-mono">
+                      <Check className="h-2 w-2" />
+                      Saved
                     </span>
                   )}
                 </div>
@@ -471,15 +513,11 @@ export function ThreatSummaryCard({
                 {riskLevel}
               </div>
 
-              {/* Actions */}
-              {showActions && data.analysisId && (
+              {/* FIX: Use analysisId instead of data.analysisId */}
+              {showActions && analysisId && (
                 <div className="flex items-center gap-0.5 border-l border-gray-200 dark:border-gray-700 pl-3 ml-1">
                   {isSaved ? (
                     <>
-                      <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 text-[9px] font-mono rounded">
-                        <Check className="h-2.5 w-2.5" />
-                        Saved
-                      </div>
                       <ActionButton
                         onClick={() => setShowDeleteConfirm(true)}
                         icon={Trash2}
@@ -490,7 +528,7 @@ export function ThreatSummaryCard({
                     <ActionButton
                       onClick={() => setShowSaveModal(true)}
                       icon={Bookmark}
-                      title="Save analysis"
+                      title="Save analysis permanently"
                     />
                   )}
 
@@ -768,7 +806,7 @@ export function ThreatSummaryCard({
                   <Bookmark className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
                 </div>
                 <h3 className="text-sm font-semibold">
-                  {isSaved ? "Update Saved Analysis" : "Save Analysis"}
+                  Save Analysis Permanently
                 </h3>
               </div>
               <button
@@ -780,32 +818,37 @@ export function ThreatSummaryCard({
             </div>
 
             <div className="p-4 space-y-3">
+              <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 p-2 rounded -mt-1">
+                <Clock className="h-3 w-3 inline mr-1" />
+                This analysis will expire in 1 hour if not saved.
+              </div>
+
               <div>
                 <label className="text-xs font-medium text-gray-700 dark:text-gray-300 block mb-1">
-                  Notes
+                  Notes (Optional)
                 </label>
                 <textarea
                   value={saveNotes}
                   onChange={(e) => setSaveNotes(e.target.value)}
                   className="w-full px-2.5 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   rows={3}
-                  placeholder="Add your notes..."
+                  placeholder="Add investigation notes, findings, or context..."
                 />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-gray-700 dark:text-gray-300 block mb-1">
-                  Tags
+                  Tags (Optional)
                 </label>
                 <input
                   type="text"
                   value={saveTags}
                   onChange={(e) => setSaveTags(e.target.value)}
-                  placeholder="malware, c2, phishing"
+                  placeholder="malware, c2, phishing, apt, ransomware"
                   className="w-full px-2.5 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
                 <p className="text-[9px] text-gray-500 mt-1">
-                  Separate tags with commas
+                  Separate multiple tags with commas
                 </p>
               </div>
             </div>
@@ -821,7 +864,7 @@ export function ThreatSummaryCard({
                 ) : (
                   <Save className="h-3 w-3" />
                 )}
-                {saving ? "Saving..." : isSaved ? "Update" : "Save"}
+                {saving ? "Saving..." : "Save Permanently"}
               </button>
               <button
                 onClick={() => setShowSaveModal(false)}
@@ -834,7 +877,7 @@ export function ThreatSummaryCard({
         </div>
       )}
 
-      {/* Delete Modal */}
+      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -848,12 +891,12 @@ export function ThreatSummaryCard({
               <div className="p-1 rounded-lg bg-red-100 dark:bg-red-950">
                 <Trash2 className="h-3.5 w-3.5 text-red-600" />
               </div>
-              <h3 className="text-sm font-semibold">Delete Saved Analysis</h3>
+              <h3 className="text-sm font-semibold">Remove Saved Analysis</h3>
             </div>
 
             <div className="p-4">
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                Remove this analysis from saved collection?
+                Remove this analysis from your saved collection?
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 This action cannot be undone.
@@ -871,7 +914,7 @@ export function ThreatSummaryCard({
                 ) : (
                   <Trash2 className="h-3 w-3" />
                 )}
-                {deleting ? "Deleting..." : "Delete"}
+                {deleting ? "Removing..." : "Remove"}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}

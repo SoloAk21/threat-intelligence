@@ -96,7 +96,8 @@ export async function threatToPDF(
     info: "#3b82f6",
   };
 
-  let y = 20;
+  // INCREASED TOP MARGIN FROM 15 TO 25mm
+  let y = 25; // Changed from 20 to 25 for more top margin
   const margin = 15;
   const contentWidth = pageWidth - margin * 2;
   const pageHeightMM = pageHeight;
@@ -114,7 +115,7 @@ export async function threatToPDF(
   const addNewPage = () => {
     pdf.addPage();
     addBackground();
-    y = margin;
+    y = 25; // Reset to increased margin on new pages
     addFooter(pdf.getNumberOfPages());
   };
 
@@ -239,10 +240,11 @@ export async function threatToPDF(
   addBackground();
 
   // ==================== COVER PAGE ====================
-  const coverY = 70;
+  // INCREASED COVER Y POSITION FOR MORE TOP MARGIN
+  const coverY = 75; // Changed from 70 to 75
 
-  // Decorative top bar
-  addGradientBar(margin, coverY - 35, contentWidth, 3, colors.primary);
+  // Decorative top bar - moved down slightly
+  addGradientBar(margin, coverY - 38, contentWidth, 3, colors.primary);
 
   // Logo area
   pdf.setFontSize(48);
@@ -263,27 +265,17 @@ export async function threatToPDF(
     align: "center",
   });
 
-  // Decorative line
-  addLine(
-    margin + 40,
-    coverY + 22,
-    margin + contentWidth - 40,
-    coverY + 22,
-    colors.primary,
-    1,
-  );
-
   // Risk badge on cover
   addBadge(
     riskLevel,
     margin + contentWidth / 2 - 20,
-    coverY + 35,
+    coverY + 38, // Adjusted for new position
     riskColor,
     riskBg,
   );
 
   // Report metadata
-  y = coverY + 55;
+  y = coverY + 55; // Increased from 55 to 60
   pdf.setFontSize(9);
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(colors.textLight);
@@ -314,9 +306,9 @@ export async function threatToPDF(
     { align: "center" },
   );
 
-  // Risk score circle
+  // Risk score circle - moved down for better spacing
   const circleX = margin + contentWidth / 2;
-  const circleY = y + 25;
+  const circleY = y + 18;
   const radius = 25;
 
   pdf.setDrawColor(colors.border);
@@ -357,9 +349,9 @@ export async function threatToPDF(
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("Executive Summary", margin, y);
-  y += 5;
+  y += 6; // Increased spacing after header
   addGradientBar(margin, y, 60, 2, colors.primary);
-  y += 10;
+  y += 12; // Increased spacing
 
   // Metadata cards
   const metaCards = [
@@ -395,7 +387,7 @@ export async function threatToPDF(
     pdf.text(valueText, x + 21.5, y + 14, { align: "center" });
   });
 
-  y += 28;
+  y += 32; // Increased spacing
 
   // AI Executive Summary
   if (data.aiSummary?.executiveSummary) {
@@ -403,9 +395,9 @@ export async function threatToPDF(
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.text);
     pdf.text("AI Executive Summary", margin, y);
-    y += 5;
+    y += 6; // Increased spacing
     addLine(margin, y, margin + 50, y, colors.primary, 0.5);
-    y += 8;
+    y += 10; // Increased spacing
 
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
@@ -414,21 +406,21 @@ export async function threatToPDF(
       data.aiSummary.executiveSummary,
       contentWidth,
     );
-    checkPageBreak(summaryLines.length * 4.5 + 10);
+    checkPageBreak(summaryLines.length * 5 + 10); // Increased line height allowance
     pdf.text(summaryLines, margin, y);
-    y += summaryLines.length * 4.5 + 8;
+    y += summaryLines.length * 5 + 10; // Increased spacing
   }
 
   // Risk Assessment Box
   if (data.aiSummary?.riskAssessment) {
-    checkPageBreak(40);
-    addRect(margin, y, contentWidth, 35, riskBg, true);
-    addRect(margin, y, 4, 35, riskColor, true);
+    checkPageBreak(45); // Increased from 40
+    addRect(margin, y, contentWidth, 38, riskBg, true); // Increased height from 35 to 38
+    addRect(margin, y, 4, 38, riskColor, true); // Increased height from 35 to 38
 
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(riskColor);
-    pdf.text("RISK ASSESSMENT", margin + 8, y + 5);
+    pdf.text("RISK ASSESSMENT", margin + 8, y + 6); // Adjusted position
 
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "normal");
@@ -438,8 +430,8 @@ export async function threatToPDF(
       assessmentText,
       contentWidth - 10,
     );
-    pdf.text(assessmentLines, margin + 8, y + 12);
-    y += 38;
+    pdf.text(assessmentLines, margin + 8, y + 13); // Adjusted position
+    y += 42; // Increased from 38
   }
 
   // ==================== PAGE 3 - THREAT METRICS ====================
@@ -449,9 +441,9 @@ export async function threatToPDF(
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("Threat Metrics Dashboard", margin, y);
-  y += 10;
+  y += 6; // Increased spacing
   addGradientBar(margin, y, 80, 2, colors.primary);
-  y += 12;
+  y += 15; // Increased spacing
 
   // Key metrics in a grid
   const metrics = [
@@ -491,39 +483,39 @@ export async function threatToPDF(
     const row = Math.floor(i / 3);
     const col = i % 3;
     const x = margin + col * 60;
-    const yPos = y + row * 35;
+    const yPos = y + row * 38; // Increased row height from 35 to 38
 
-    addRect(x, yPos, 58, 32, colors.backgroundAlt, true);
-    addRect(x, yPos, 58, 32, colors.border, false);
+    addRect(x, yPos, 58, 34, colors.backgroundAlt, true); // Increased height from 32 to 34
+    addRect(x, yPos, 58, 34, colors.border, false);
 
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.textLight);
-    pdf.text(metric.label, x + 4, yPos + 6);
+    pdf.text(metric.label, x + 4, yPos + 7); // Adjusted position
 
     pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.primary);
-    pdf.text(metric.value, x + 4, yPos + 20);
+    pdf.text(metric.value, x + 4, yPos + 22); // Adjusted position
 
     pdf.setFontSize(7);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(colors.textLight);
-    pdf.text(metric.sub, x + 4, yPos + 28);
+    pdf.text(metric.sub, x + 4, yPos + 30); // Adjusted position
   });
 
-  y += 75;
+  y += 82; // Increased from 75
 
   // Progress bar for AbuseIPDB confidence
   if (data.abuseipdb?.abuseConfidenceScore) {
-    checkPageBreak(20);
+    checkPageBreak(25); // Increased from 20
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.text);
     pdf.text("Threat Confidence Analysis", margin, y);
-    y += 5;
+    y += 6; // Increased spacing
     addLine(margin, y, margin + 60, y, colors.primary, 0.5);
-    y += 8;
+    y += 10; // Increased spacing
 
     const confidence = data.abuseipdb.abuseConfidenceScore;
     pdf.setFontSize(8);
@@ -540,7 +532,7 @@ export async function threatToPDF(
           : colors.medium,
     );
     pdf.text(`${confidence}%`, margin + 60, y);
-    y += 3;
+    y += 4; // Increased spacing
     addRect(margin, y, contentWidth, 4, colors.border, true);
     addRect(
       margin,
@@ -554,7 +546,7 @@ export async function threatToPDF(
           : colors.medium,
       true,
     );
-    y += 10;
+    y += 12; // Increased spacing
   }
 
   // ==================== PAGE 4 - DETAILED INTEL ====================
@@ -564,11 +556,11 @@ export async function threatToPDF(
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("Detailed Threat Intelligence", margin, y);
-  y += 5;
+  y += 6; // Increased spacing
   addGradientBar(margin, y, 90, 2, colors.primary);
-  y += 12;
+  y += 15; // Increased spacing
 
-  // VirusTotal details - Fixed TypeScript errors
+  // VirusTotal details
   const vtStats =
     (data.vt?.last_analysis_stats as {
       malicious?: number;
@@ -587,11 +579,10 @@ export async function threatToPDF(
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("VirusTotal Analysis", margin, y);
-  y += 5;
+  y += 6; // Increased spacing
   addLine(margin, y, margin + 50, y, colors.primary, 0.5);
-  y += 8;
+  y += 10; // Increased spacing
 
-  // Type-safe array with explicit typing
   const vtData: Array<[string, number, string]> = [
     ["Malicious", malicious, colors.critical],
     ["Suspicious", suspicious, colors.high],
@@ -600,7 +591,6 @@ export async function threatToPDF(
   ];
 
   vtData.forEach(([label, count, color]) => {
-    // Now count is guaranteed to be a number
     const percent =
       totalEngines > 0 ? (count / totalEngines) * contentWidth : 0;
 
@@ -613,16 +603,16 @@ export async function threatToPDF(
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(color);
     pdf.text(`${count}`, margin + 45, y);
-    y += 3;
+    y += 4; // Increased spacing
 
     addRect(margin, y, contentWidth, 3, colors.border, true);
     if (percent > 0) {
       addRect(margin, y, percent, 3, color, true);
     }
-    y += 6;
+    y += 8; // Increased spacing
   });
 
-  y += 5;
+  y += 8; // Increased spacing
 
   // Malicious vendors
   const maliciousVendors = Object.entries(data.vt?.last_analysis_results || {})
@@ -630,7 +620,7 @@ export async function threatToPDF(
     .map(([k]) => k);
 
   if (maliciousVendors.length > 0) {
-    checkPageBreak(20);
+    checkPageBreak(25); // Increased from 20
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.critical);
@@ -641,19 +631,19 @@ export async function threatToPDF(
     const vendors = maliciousVendors.slice(0, 8).join(", ");
     const vendorLines = pdf.splitTextToSize(vendors, contentWidth - 40);
     pdf.text(vendorLines, margin + 25, y);
-    y += vendorLines.length * 4 + 8;
+    y += vendorLines.length * 5 + 10; // Increased spacing
   }
 
-  // AbuseIPDB details
+  // ==================== PAGE 5 - ABUSEIPDB DETAILS ====================
   addNewPage();
 
   pdf.setFontSize(11);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("AbuseIPDB Intelligence", margin, y);
-  y += 5;
+  y += 6; // Increased spacing
   addLine(margin, y, margin + 60, y, colors.primary, 0.5);
-  y += 8;
+  y += 12; // Increased spacing
 
   const abuseDetails: Array<[string, string]> = [
     ["Confidence Score", `${data.abuseipdb?.abuseConfidenceScore || 0}%`],
@@ -666,7 +656,7 @@ export async function threatToPDF(
   ];
 
   abuseDetails.forEach(([label, value]) => {
-    checkPageBreak(6);
+    checkPageBreak(8); // Increased from 6
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.textLight);
@@ -674,14 +664,14 @@ export async function threatToPDF(
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(colors.text);
     pdf.text(value, margin + 50, y);
-    y += 6;
+    y += 8; // Increased spacing
   });
 
-  y += 5;
+  y += 8; // Increased spacing
 
   // Last reported
   if (data.abuseipdb?.lastReportedAt) {
-    checkPageBreak(10);
+    checkPageBreak(12); // Increased from 10
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "italic");
     pdf.setTextColor(colors.textLight);
@@ -690,29 +680,29 @@ export async function threatToPDF(
       margin,
       y,
     );
-    y += 6;
+    y += 8; // Increased spacing
   }
 
-  // ==================== PAGE 5 - NETWORK & GEOLOCATION ====================
+  // ==================== PAGE 6 - NETWORK & GEOLOCATION ====================
   addNewPage();
 
   pdf.setFontSize(18);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("Network & Geolocation", margin, y);
-  y += 5;
+  y += 6; // Increased spacing
   addGradientBar(margin, y, 80, 2, colors.primary);
-  y += 12;
+  y += 15; // Increased spacing
 
   // Location information
   if (data.ipinfo?.country || data.abuseipdb?.countryName) {
-    addRect(margin, y, contentWidth, 45, colors.backgroundAlt, true);
-    addRect(margin, y, 4, 45, colors.primary, true);
+    addRect(margin, y, contentWidth, 50, colors.backgroundAlt, true); // Increased height from 45 to 50
+    addRect(margin, y, 4, 50, colors.primary, true); // Increased height from 45 to 50
 
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.primary);
-    pdf.text("Location Information", margin + 10, y + 6);
+    pdf.text("Location Information", margin + 10, y + 8); // Adjusted position
 
     const locationItems: Array<[string, string]> = [
       ["Country", data.ipinfo?.country || data.abuseipdb?.countryName || "N/A"],
@@ -725,25 +715,25 @@ export async function threatToPDF(
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(colors.textLight);
-      pdf.text(label, margin + 10, y + 16 + idx * 7);
+      pdf.text(label, margin + 10, y + 20 + idx * 8); // Adjusted spacing
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(colors.text);
-      pdf.text(value, margin + 40, y + 16 + idx * 7);
+      pdf.text(value, margin + 40, y + 20 + idx * 8);
     });
 
-    y += 55;
+    y += 60; // Increased from 55
   }
 
   // Network information
   if (data.ipinfo?.org_name || data.vt?.as_owner) {
-    checkPageBreak(70);
-    addRect(margin, y, contentWidth, 60, colors.backgroundAlt, true);
-    addRect(margin, y, 4, 60, colors.secondary, true);
+    checkPageBreak(75); // Increased from 70
+    addRect(margin, y, contentWidth, 65, colors.backgroundAlt, true); // Increased height from 60 to 65
+    addRect(margin, y, 4, 65, colors.secondary, true); // Increased height from 60 to 65
 
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.secondary);
-    pdf.text("Network Information", margin + 10, y + 6);
+    pdf.text("Network Information", margin + 10, y + 8); // Adjusted position
 
     const networkItems: Array<[string, string]> = [
       ["ISP", data.ipinfo?.org_name || data.abuseipdb?.isp || "N/A"],
@@ -763,51 +753,52 @@ export async function threatToPDF(
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(colors.textLight);
-      pdf.text(label, margin + 10, y + 18 + idx * 8);
+      pdf.text(label, margin + 10, y + 20 + idx * 9); // Adjusted spacing
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(colors.text);
       const truncatedValue =
         value.length > 35 ? value.substring(0, 32) + "..." : value;
-      pdf.text(truncatedValue, margin + 40, y + 18 + idx * 8);
+      pdf.text(truncatedValue, margin + 45, y + 20 + idx * 9); // Adjusted spacing
     });
+    y += 75; // Increased from 70
   }
 
-  // ==================== PAGE 6 - RECOMMENDATIONS ====================
+  // ==================== PAGE 7 - RECOMMENDATIONS ====================
   addNewPage();
 
   pdf.setFontSize(18);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("Recommendations & Actions", margin, y);
-  y += 5;
+  y += 6; // Increased spacing
   addGradientBar(margin, y, 85, 2, colors.primary);
-  y += 12;
+  y += 15; // Increased spacing
 
   if (data.aiSummary?.recommendations?.length) {
     data.aiSummary.recommendations.forEach((rec) => {
-      checkPageBreak(8);
-      addRect(margin, y, 4, 6, colors.primary, true);
+      checkPageBreak(10); // Increased from 8
+      addRect(margin, y, 4, 7, colors.primary, true); // Increased height from 6 to 7
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(colors.text);
       const recLines = pdf.splitTextToSize(rec, contentWidth - 15);
-      pdf.text(recLines, margin + 10, y + 4);
-      y += recLines.length * 4 + 6;
+      pdf.text(recLines, margin + 10, y + 5); // Adjusted position
+      y += recLines.length * 5 + 8; // Increased spacing
     });
   }
 
-  y += 10;
+  y += 12; // Increased spacing
 
   // Tactical advice box
   if (data.aiSummary?.tacticalAdvice) {
-    checkPageBreak(30);
-    addRect(margin, y, contentWidth, 28, colors.warning + "20", true);
-    addRect(margin, y, 4, 28, colors.warning, true);
+    checkPageBreak(35); // Increased from 30
+    addRect(margin, y, contentWidth, 32, colors.warning + "20", true); // Increased height from 28 to 32
+    addRect(margin, y, 4, 32, colors.warning, true); // Increased height from 28 to 32
 
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.warning);
-    pdf.text("IMMEDIATE ACTION REQUIRED", margin + 10, y + 6);
+    pdf.text("IMMEDIATE ACTION REQUIRED", margin + 10, y + 7); // Adjusted position
 
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "normal");
@@ -816,20 +807,20 @@ export async function threatToPDF(
       data.aiSummary.tacticalAdvice,
       contentWidth - 15,
     );
-    pdf.text(adviceLines, margin + 10, y + 14);
-    y += 32;
+    pdf.text(adviceLines, margin + 10, y + 16); // Adjusted position
+    y += 38; // Increased from 32
   }
 
-  // ==================== PAGE 7 - SOURCES ====================
+  // ==================== PAGE 8 - SOURCES ====================
   addNewPage();
 
   pdf.setFontSize(16);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(colors.primary);
   pdf.text("Threat Intelligence Sources", margin, y);
-  y += 5;
+  y += 6; // Increased spacing
   addGradientBar(margin, y, 90, 2, colors.primary);
-  y += 12;
+  y += 15; // Increased spacing
 
   const sources = [
     "AbuseIPDB",
@@ -852,7 +843,7 @@ export async function threatToPDF(
     const row = Math.floor(i / 4);
     const col = i % 4;
     const x = margin + col * 45;
-    const yPos = y + row * 9;
+    const yPos = y + row * 10; // Increased spacing from 9 to 10
 
     pdf.setFontSize(7);
     pdf.setFont("helvetica", "normal");
@@ -861,19 +852,19 @@ export async function threatToPDF(
     pdf.text(source, x + 3, yPos);
   });
 
-  y += 50;
+  y += 55; // Increased from 50
 
   // AI model info
   if (data.aiSummaryMeta?.model) {
-    checkPageBreak(20);
-    addRect(margin, y, contentWidth, 20, colors.backgroundAlt, true);
+    checkPageBreak(25); // Increased from 20
+    addRect(margin, y, contentWidth, 22, colors.backgroundAlt, true); // Increased height from 20 to 22
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(colors.textLight);
-    pdf.text("Analysis Engine", margin + 5, y + 6);
+    pdf.text("Analysis Engine", margin + 5, y + 7); // Adjusted position
     pdf.setTextColor(colors.primary);
-    pdf.text(data.aiSummaryMeta.model, margin + 5, y + 13);
-    y += 25;
+    pdf.text(data.aiSummaryMeta.model, margin + 5, y + 15); // Adjusted position
+    y += 28; // Increased from 25
   }
 
   // Confidence level
@@ -893,7 +884,7 @@ export async function threatToPDF(
         data.aiSummary.confidenceLevel as keyof typeof confidenceColors
       ] || colors.primary,
     );
-    pdf.text(data.aiSummary.confidenceLevel, margin + 40, y);
+    pdf.text(data.aiSummary.confidenceLevel, margin + 42, y); // Adjusted position
   }
 
   // Final footer on all pages

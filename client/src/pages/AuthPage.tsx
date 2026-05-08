@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Shield, LogIn, UserPlus, Activity } from "lucide-react";
 import { SignIn } from "../components/SignIn";
 import { SignUp } from "../components/SignUp";
-import { ForgotPassword } from "../components/ForgotPassword";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
@@ -114,9 +113,6 @@ export const AuthPage: React.FC = () => {
                   onSwitchToSignIn={() => setMode("signin")}
                   onSuccess={handleSuccess}
                 />
-              )}
-              {mode === "forgot" && (
-                <ForgotPassword onBackToSignIn={() => setMode("signin")} />
               )}
             </motion.div>
           </AnimatePresence>

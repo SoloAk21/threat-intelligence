@@ -1,11 +1,9 @@
-// src/components/AnalysisResults.tsx
 import { motion } from "framer-motion";
 import { Shield } from "lucide-react";
 import { toast } from "sonner";
 import type { ThreatData } from "@/types/threat";
 import { ThreatSummaryCard } from "./ThreatSummaryCard";
-import { threatToCSV, threatToJSON, threatToPDF } from "@/utils/exportUtils";
-import { api } from "@/lib/api";
+import { saveAnalysis } from "@/lib/api";
 
 import { AbuseIPDBCard } from "./cards/AbuseIPDBCard";
 import { GreyNoiseCard } from "./cards/GreyNoiseCard";
@@ -24,65 +22,42 @@ import { URLHausCard } from "./cards/URLHausCard";
 import { SucuriCard } from "./cards/SucuriCard";
 
 export function AnalysisResults({ data }: { data: ThreatData }) {
-  const inputType = data.inputType || "ip";
+  const inputType = data.inputType || data.type || "ip";
   const isIP = inputType === "ip";
   const isURL = inputType === "url";
   const isDomain = inputType === "domain";
   const isHash = inputType === "hash";
 
-  const handleExport = async (format: "json" | "csv" | "pdf") => {
-    let blob: Blob;
-    let filename: string;
-
-    switch (format) {
-      case "json":
-        blob = new Blob([threatToJSON(data)], { type: "application/json" });
-        filename = `threat-${data.input}-${Date.now()}.json`;
-        break;
-      case "csv":
-        blob = new Blob([threatToCSV(data)], { type: "text/csv" });
-        filename = `threat-${data.input}-${Date.now()}.csv`;
-        break;
-      case "pdf":
-        blob = await threatToPDF(data);
-        filename = `threat-${data.input}-${Date.now()}.pdf`;
-        break;
-    }
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    toast.success(`Exported as ${format.toUpperCase()}`);
-  };
-
-  const handleSave = async () => {
+  const handleSave = async (
+    notes?: string,
+    tags?: string[],
+  ): Promise<boolean> => {
     if (!data.analysisId) {
-      toast.error("Cannot save: No analysis ID found");
-      return;
+      toast.error(
+        "Cannot save: No analysis ID found. Please re-run the analysis.",
+      );
+      return false;
     }
 
     try {
-      const response = await api.post("/save", {
-        analysisId: data.analysisId,
-        notes: "",
-        tags: [],
-      });
+      const response = await saveAnalysis(data.analysisId, notes, tags);
 
-      if (response.data.success) {
-        toast.success(
-          response.data.message || "Analysis saved to your collection",
-        );
+      if (response.success) {
+        toast.success(response.message || "Analysis saved to your collection");
+        return true;
       }
+      return false;
     } catch (err: any) {
-      if (err.response?.data?.error?.includes("already saved")) {
-        toast.info("Analysis already saved");
+      if (err.response?.status === 409) {
+        toast.info("This analysis is already saved");
+      } else if (err.response?.status === 404) {
+        toast.error(
+          "Analysis expired. Please re-run the analysis before saving.",
+        );
       } else {
-        toast.error("Failed to save analysis");
+        toast.error(err.response?.data?.error || "Failed to save analysis");
       }
+      return false;
     }
   };
 
@@ -187,12 +162,7 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
       animate={{ opacity: 1 }}
       className="max-w-6xl mx-auto space-y-3 px-3 py-3"
     >
-      <ThreatSummaryCard
-        data={data}
-        showActions={true}
-        onExport={handleExport}
-        onSave={handleSave}
-      />
+      <ThreatSummaryCard data={data} showActions={true} onSave={handleSave} />
 
       {visibleCards.length > 0 && (
         <div className="space-y-3">
@@ -214,7 +184,10 @@ export function AnalysisResults({ data }: { data: ThreatData }) {
           <div className="text-center">
             <Shield className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
             <p className="text-xs text-muted-foreground">
-              No intelligence data available
+              No intelligence data available for this indicator
+            </p>
+            <p className="text-[10px] text-muted-foreground/50 mt-1">
+              Try analyzing a different IP, domain, URL, or file hash
             </p>
           </div>
         </div>

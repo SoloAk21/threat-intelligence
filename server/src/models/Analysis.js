@@ -1,4 +1,3 @@
-// src/models/Analysis.js
 const mongoose = require("mongoose");
 
 const analysisSchema = new mongoose.Schema(
@@ -77,18 +76,21 @@ const analysisSchema = new mongoose.Schema(
   },
 );
 
-// TTL index - only delete non-saved analyses after 30 days
+// TTL index - ONLY for unsaved analyses (deleted after 7 days)
 analysisSchema.index(
   { createdAt: 1 },
   {
-    expireAfterSeconds: 30 * 24 * 60 * 60,
+    expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
     partialFilterExpression: { saved: false },
   },
 );
 
+// Saved analyses never expire (no TTL)
+// Indexes for performance
 analysisSchema.index({ userId: 1, saved: 1, createdAt: -1 });
 analysisSchema.index({ userId: 1, starred: 1, saved: 1 });
 analysisSchema.index({ userId: 1, tags: 1 });
+analysisSchema.index({ userId: 1, input: 1, saved: 1 });
 
 analysisSchema.methods.compressResponses = function () {
   if (this.serviceResponses?.vt?.last_analysis_results) {
@@ -102,6 +104,7 @@ analysisSchema.statics.findRecent = function (input, inputType, hours = 24) {
   return this.findOne({
     input,
     inputType,
+    saved: true, // Only return saved analyses for cache
     createdAt: { $gte: cutoff },
   }).sort({ createdAt: -1 });
 };

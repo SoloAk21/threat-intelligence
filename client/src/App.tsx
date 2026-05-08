@@ -11,7 +11,6 @@ import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState, useCallback } from "react";
 import { UnifiedAnalysisPage } from "@/components/UnifiedAnalysisPage";
 import { AuthPage } from "@/pages/AuthPage";
-import { ResetPassword } from "@/components/ResetPassword";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { UserMenu } from "@/components/UserMenu";
 import NotFound from "@/pages/NotFound";
@@ -383,7 +382,6 @@ function Layout() {
       <main className="relative z-10 pt-14 lg:pt-16 min-h-[calc(100vh-3.5rem)]">
         <Routes>
           <Route path="/auth" element={<AuthPage />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             path="/"
             element={

@@ -616,7 +616,9 @@ export interface AISummaryMeta {
   error?: string;
 }
 
+// Add these missing properties to ThreatData interface
 export interface ThreatData {
+  _id?: string; // Add this for saved analyses
   riskScore: number;
   riskLevel?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
   input: string;
@@ -625,6 +627,11 @@ export interface ThreatData {
   timestamp: string;
   analysisDuration?: number;
   analysisId?: string;
+  saved?: boolean; // Add this property
+  savedAt?: string;
+  notes?: string;
+  tags?: string[];
+  starred?: boolean;
   vt?: VirusTotalData;
   abuseipdb?: AbuseIPDBData;
   otx?: OTXData;
@@ -650,7 +657,6 @@ export interface ThreatData {
   aiSummary?: AISummary;
   aiSummaryMeta?: AISummaryMeta;
 }
-
 export interface AnalysisResponse {
   success: boolean;
   data: ThreatData;
